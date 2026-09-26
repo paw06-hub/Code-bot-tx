@@ -6,17 +6,17 @@ const fs = require('fs');
 const express = require('express');
 
 // ==========================================
-// 1. TẠO WEB SERVER GIỮ BOT SỐNG TRÊN RENDER
+// 1. WEB SERVER GIỮ BOT SỐNG (RENDER HEALTH CHECK)
 // ==========================================
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('Bot Discord đang chạy trực tuyến trên Render!');
+    res.send('Bot Discord Casino đang hoạt động bình thường trên Render!');
 });
 
 app.listen(PORT, () => {
-    console.log(`🌐 Web server HTTP đang mở tại port ${PORT} (Dành cho Render Health Check)`);
+    console.log(`🌐 Web server HTTP đang mở tại port ${PORT}`);
 });
 
 // ==========================================
@@ -30,10 +30,15 @@ const client = new Client({
     ]
 });
 
-// CONFIGURATION (Nên dùng process.env.TOKEN trên Render Dashboard)
+// LẤY DỮ LIỆU BẢO MẬT TỪ BIẾN MÔI TRƯỜNG (ENVIRONMENT VARIABLES)
 const PREFIX = '!';
-const TOKEN = process.env.TOKEN || 'MTU1MzUxMjIxOTc4NDc3MzY1Mg.Gg7L0Q.yYGP13Si_QmKJdfwKd7pqZVNB63n87LYnhvu88';
-const ADMIN_ID = process.env.ADMIN_ID || '1498554147304247296'; 
+const TOKEN = process.env.TOKEN;
+const ADMIN_ID = process.env.ADMIN_ID; 
+
+if (!TOKEN) {
+    console.error('❌ LỖI KHỞI ĐỘNG: Chưa cài đặt TOKEN trong biến môi trường!');
+    process.exit(1);
+}
 
 const FILES = {
     BALANCES: './balances.json',
