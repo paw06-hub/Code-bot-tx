@@ -44,7 +44,8 @@ const FILES = {
     WORD_CONFIG: './word_config.json', // Kênh Nối Từ
     LODE_CONFIG: './lode_config.json', // Kênh Lô Đề 18h
     LOTTERY: './lottery.json',         // Vé số, Cược Lô Đề & KQXS
-    STAFFS: './staffs.json'            // File lưu danh sách Staff
+    STAFFS: './staffs.json',           // File lưu danh sách Staff
+    LOANS: './loans.json'              // File lưu khoản vay & nợ
 };
 
 // DATA MANAGERS & AUTO-SAVE IMMEDIATELY
@@ -76,6 +77,7 @@ let wordConfig = loadJSON(FILES.WORD_CONFIG, false);
 let lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
 let lotteryData = loadJSON(FILES.LOTTERY, false);
 let staffList = loadJSON(FILES.STAFFS, false);
+let loans = loadJSON(FILES.LOANS); // Map lưu nợ vay
 
 if (!lotteryData.tickets) lotteryData.tickets = [];
 if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
@@ -133,6 +135,23 @@ const getBalance = (userId) => {
 const setBalance = (userId, amount) => {
     balances.set(userId, Math.max(0, amount));
     saveJSONSync(FILES.BALANCES, balances); // Ghi đĩa ngay lập tức
+};
+
+// HELPER MANAGEMENT FOR LOANS
+const LOAN_INTEREST_RATE = 0.30; // Lãi suất 30%
+const MAX_LOAN_LIMIT = 5000000;   // Hạn ngạch vay tối đa: 5.000.000đ
+
+const getLoan = (userId) => {
+    return loans.get(userId) || 0;
+};
+
+const setLoan = (userId, amount) => {
+    if (amount <= 0) {
+        loans.delete(userId);
+    } else {
+        loans.set(userId, amount);
+    }
+    saveJSONSync(FILES.LOANS, loans);
 };
 
 // GAME NỐI TỪ SESSION
@@ -718,6 +737,84 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
+        // 🏦 HỆ THỐNG VAY TIỀN & TRẢ NỢ (TÍN DỤNG) - LÃI SUẤT 30%
+        if (command === 'vay' || command === 'vaytien') {
+            const amount = parseInt(args[0], 10);
+            const currentDebt = getLoan(userId);
+
+            if (isNaN(amount) || amount <= 0) {
+                const embed = new EmbedBuilder()
+                    .setColor('Yellow')
+                    .setTitle('🏦 NGÂN HÀNG DISCORD - THÔNG TIN VAY')
+                    .setDescription(`• Lãi suất cố định: **${LOAN_INTEREST_RATE * 100}%**\n• Hạn ngạch tối đa: **${formatMoney(MAX_LOAN_LIMIT)}**\n• Nợ hiện tại của bạn: **${formatMoney(currentDebt)}**`)
+                    .setFooter({ text: 'Cú pháp vay: !vay <số_tiền>' });
+                return message.reply({ embeds: [embed] });
+            }
+
+            if (currentDebt > 0) {
+                return message.reply(`❌ Bạn chưa thể vay thêm! Hãy trả hết khoản nợ cũ **${formatMoney(currentDebt)}** bằng lệnh \`!trano\` trước.`);
+            }
+
+            if (amount > MAX_LOAN_LIMIT) {
+                return message.reply(`❌ Số tiền vay vượt quá hạn ngạch cho phép! Tối đa bạn chỉ được vay **${formatMoney(MAX_LOAN_LIMIT)}**.`);
+            }
+
+            const totalDebtWithInterest = Math.floor(amount * (1 + LOAN_INTEREST_RATE));
+            
+            setLoan(userId, totalDebtWithInterest);
+            setBalance(userId, getBalance(userId) + amount);
+
+            const embedSuccess = new EmbedBuilder()
+                .setColor('Green')
+                .setTitle('🏦 VAY TIỀN THÀNH CÔNG')
+                .addFields(
+                    { name: '💵 Số tiền thực nhận', value: `**+${formatMoney(amount)}**`, inline: true },
+                    { name: '📈 Tổng nợ phải trả (gồm 30% lãi)', value: `**${formatMoney(totalDebtWithInterest)}**`, inline: true },
+                    { name: '💰 Ví hiện tại', value: `**${formatMoney(getBalance(userId))}**`, inline: false }
+                )
+                .setFooter({ text: 'Dùng !trano <số_tiền> để hoàn trả khoản vay.' });
+
+            return message.reply({ embeds: [embedSuccess] });
+        }
+
+        if (command === 'trano' || command === 'payloan') {
+            const currentDebt = getLoan(userId);
+            if (currentDebt <= 0) {
+                return message.reply('🎉 Bạn hiện không có khoản nợ nào!');
+            }
+
+            let payAmount = parseInt(args[0], 10);
+            if (args[0]?.toLowerCase() === 'all') {
+                payAmount = currentDebt;
+            }
+
+            if (isNaN(payAmount) || payAmount <= 0) {
+                return message.reply(`❌ Cú pháp: \`!trano <số_tiền>\` hoặc \`!trano all\`.\n📌 Tổng nợ cần trả: **${formatMoney(currentDebt)}**`);
+            }
+
+            const bal = getBalance(userId);
+            if (bal < payAmount) {
+                return message.reply(`❌ Bạn không đủ tiền mặt để trả! Số dư hiện tại: **${formatMoney(bal)}**.`);
+            }
+
+            const actualPayment = Math.min(payAmount, currentDebt);
+            const remainingDebt = currentDebt - actualPayment;
+
+            setBalance(userId, bal - actualPayment);
+            setLoan(userId, remainingDebt);
+
+            const embedPay = new EmbedBuilder()
+                .setColor('Blue')
+                .setTitle('💳 THANH TOÁN KHOẢN NỢ')
+                .addFields(
+                    { name: '💸 Số tiền đã trả', value: `**-${formatMoney(actualPayment)}**`, inline: true },
+                    { name: '📌 Nợ còn lại', value: `**${formatMoney(remainingDebt)}**`, inline: true },
+                    { name: '💰 Ví hiện tại', value: `**${formatMoney(getBalance(userId))}**`, inline: false }
+                );
+
+            return message.reply({ embeds: [embedPay] });
+        }
+
         // 📦 EXPORT BACKUP DỮ LIỆU SỐ DƯ & CẤU HÌNH
         if (command === 'exportdata' || command === 'backupdata') {
             if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền export dữ liệu!');
@@ -745,7 +842,6 @@ client.on('messageCreate', async message => {
             const fileName = attachment.name;
             let targetPath = null;
 
-            // Tự động nhận diện tên file để lưu vào đúng mục
             if (fileName.includes('balances')) targetPath = FILES.BALANCES;
             else if (fileName.includes('titles')) targetPath = FILES.TITLES;
             else if (fileName.includes('config')) targetPath = FILES.CONFIG;
@@ -753,20 +849,18 @@ client.on('messageCreate', async message => {
             else if (fileName.includes('lottery')) targetPath = FILES.LOTTERY;
             else if (fileName.includes('word_config')) targetPath = FILES.WORD_CONFIG;
             else if (fileName.includes('lode_config')) targetPath = FILES.LODE_CONFIG;
+            else if (fileName.includes('loans')) targetPath = FILES.LOANS;
 
             if (!targetPath) {
-                return message.reply('❌ File đính kèm không đúng định dạng tên! (Cần chứa một trong các tên: `balances.json`, `titles.json`, `staffs.json`, `config.json`,...)');
+                return message.reply('❌ File đính kèm không đúng định dạng tên! (Cần chứa một trong các tên: `balances.json`, `titles.json`, `loans.json`, `staffs.json`,...)');
             }
 
             try {
-                // Tải dữ liệu từ Discord về
                 const response = await axios.get(attachment.url);
                 const importedData = response.data;
 
-                // Ghi đè vào ổ đĩa
                 fs.writeFileSync(targetPath, JSON.stringify(importedData, null, 2), 'utf8');
 
-                // Nạp lại biến RAM ngay lập tức
                 if (targetPath === FILES.BALANCES) balances = loadJSON(FILES.BALANCES);
                 if (targetPath === FILES.TITLES) customTitles = loadJSON(FILES.TITLES);
                 if (targetPath === FILES.CONFIG) config = loadJSON(FILES.CONFIG, false);
@@ -774,6 +868,7 @@ client.on('messageCreate', async message => {
                 if (targetPath === FILES.LOTTERY) lotteryData = loadJSON(FILES.LOTTERY, false);
                 if (targetPath === FILES.WORD_CONFIG) wordConfig = loadJSON(FILES.WORD_CONFIG, false);
                 if (targetPath === FILES.LODE_CONFIG) lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
+                if (targetPath === FILES.LOANS) loans = loadJSON(FILES.LOANS);
 
                 return message.reply(`✅ Khôi phục thành công dữ liệu cho file **${fileName}**! Hệ thống đã tự động cập nhật.`);
             } catch (err) {
@@ -1081,7 +1176,7 @@ client.on('messageCreate', async message => {
                 .setColor('Random')
                 .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH BOT')
                 .addFields(
-                    { name: '💼 Kinh tế', value: '`!profile`, `!sodu`, `!daily`, `!work`, `!trom`, `!chuyen`, `!top`', inline: false },
+                    { name: '💼 Kinh tế & Ngân hàng', value: '`!profile`, `!sodu`, `!daily`, `!work`, `!trom`, `!chuyen`, `!top`\n• **Vay tiền:** `!vay <số_tiền>` (Lãi suất 30%)\n• **Trả nợ:** `!trano <số_tiền|all>`', inline: false },
                     { name: '🎲 Mini-Game', value: '• **Tài Xỉu:** Đặt trực tiếp qua nút bấm.\n• **Blackjack:** `!bj <tiền>`\n• **Nối Từ:** Nhập từ trong kênh game.\n• **Vé Số:** `!veso mua <6_chữ_số>`\n• **Lô Đề:** `!lode de/lo <2_chữ_số> <tiền>`\n• **KQXS:** `!ketqua`', inline: false },
                     { name: '🛡️ Quản trị Staff & Admin', value: '`!cong @user <tiền>`, `!tru @user <tiền>`, `!settaixiu`, `!setnoitu`, `!setlode`, `!noitu reset`', inline: false },
                     { name: '👑 Bot Owner (Chủ Bot)', value: '`!addstaff @user`, `!delstaff @user`, `!stafflist`, `!resetmoney`, `!settitle`, `!forcedraw`, `!exportdata`, `!importdata` (Đính kèm file)', inline: false }
@@ -1095,6 +1190,7 @@ client.on('messageCreate', async message => {
         if (command === 'profile' || command === 'pf') {
             const targetUser = message.mentions.users.first() || message.author;
             const bal = getBalance(targetUser.id);
+            const loan = getLoan(targetUser.id);
             
             const sorted = Array.from(balances.entries()).sort((a, b) => b[1] - a[1]);
             const rankIndex = sorted.findIndex(([id]) => id === targetUser.id);
@@ -1117,6 +1213,7 @@ client.on('messageCreate', async message => {
                 .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: '💰 Số dư', value: `**${formatMoney(bal)}**`, inline: true },
+                    { name: '💳 Tiền nợ', value: `**${formatMoney(loan)}**`, inline: true },
                     { name: '🏆 BXH Toàn Cầu', value: `**#${rank}**`, inline: true },
                     { name: '🎖️ Danh hiệu', value: `**${title}**`, inline: false }
                 )
