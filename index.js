@@ -1,7 +1,7 @@
 const { 
     Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, 
     ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle,
-    AttachmentBuilder
+    AttachmentBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder
 } = require('discord.js');
 const fs = require('fs');
 const express = require('express');
@@ -185,13 +185,29 @@ const getCryptoChartUrl = (symbol, coin) => {
     return `https://quickchart.io/chart?w=500&h=250&bkg=#2f3136&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
 };
 
-// ĐÃ THU GỌN VỀ ĐÚNG 4 NÚT DUY NHẤT CHO GIAO DIỆN GỌN GÀNG
+// ==========================================
+// GIAO DIỆN 4 NÚT CHÍNH GỌN GÀNG (MUA, BÁN, BIỂU ĐỒ, VÍ)
+// ==========================================
 const getCrypto4ButtonsRow = () => {
     return new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('c_buy_BTC').setLabel('🛒 Mua BTC').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('c_sell_BTC').setLabel('💰 Bán BTC').setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId('c_chart_BTC').setLabel('📈 Biểu đồ BTC').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('c_menu_buy').setLabel('🛒 Mua Coin').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('c_menu_sell').setLabel('💰 Bán Coin').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('c_menu_chart').setLabel('📈 Xem Biểu Đồ').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId('c_portfolio').setLabel('💼 Xem Ví').setStyle(ButtonStyle.Secondary)
+    );
+};
+
+// Menu chọn coin tích hợp cho Mua / Bán / Xem biểu đồ
+const getCoinSelectMenu = (actionType) => {
+    return new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId(`select_coin_${actionType}`)
+            .setPlaceholder('👉 Chọn đồng coin bạn muốn thao tác...')
+            .addOptions([
+                new StringSelectMenuOptionBuilder().setLabel('Bitcoin (BTC)').setDescription('Giá: ' + formatMoney(cryptoMarket.coins['BTC'].price)).setValue('BTC').setEmoji('🪙'),
+                new StringSelectMenuOptionBuilder().setLabel('Ethereum (ETH)').setDescription('Giá: ' + formatMoney(cryptoMarket.coins['ETH'].price)).setValue('ETH').setEmoji('🪙'),
+                new StringSelectMenuOptionBuilder().setLabel('JangJii Coin (JNG)').setDescription('Giá: ' + formatMoney(cryptoMarket.coins['JNG'].price)).setValue('JNG').setEmoji('🚀')
+            ])
     );
 };
 
@@ -584,7 +600,7 @@ client.once('ready', () => {
 });
 
 // ==========================================
-// 3. XỬ LÝ SỰ KIỆN TƯƠNG TÁC (NÚT BẤM & MODAL)
+// 3. XỬ LÝ SỰ KIỆN TƯƠNG TÁC (NÚT BẤM, MENU & MODAL)
 // ==========================================
 client.on('interactionCreate', async interaction => {
     if (!interaction.guildId) return;
@@ -618,6 +634,7 @@ client.on('interactionCreate', async interaction => {
             return interaction.showModal(modal);
         }
 
+        // XỬ LÝ SUBMIT MODAL GIAO DỊCH COIN
         if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_')) {
             if (interaction.customId === 'modal_tai' || interaction.customId === 'modal_xiu') {
                 const choice = interaction.customId === 'modal_tai' ? 'tai' : 'xiu';
@@ -638,9 +655,10 @@ client.on('interactionCreate', async interaction => {
                 return interaction.reply({ content: `✅ Đã cược **${formatMoney(bet)}** vào **${choice.toUpperCase()}**!`, ephemeral: true });
             }
 
-            if (interaction.customId.startsWith('modal_c_buy_') || interaction.customId.startsWith('modal_c_sell_')) {
-                const isBuy = interaction.customId.includes('c_buy_');
-                const symbol = interaction.customId.split('_').pop();
+            if (interaction.customId.startsWith('modal_trade_')) {
+                const parts = interaction.customId.split('_'); // ['modal', 'trade', 'buy'/'sell', 'BTC'/'ETH'/'JNG']
+                const isBuy = parts[2] === 'buy';
+                const symbol = parts[3];
                 const amount = parseInt(interaction.fields.getTextInputValue('crypto_amount'), 10);
 
                 if (isNaN(amount) || amount <= 0) {
@@ -661,7 +679,7 @@ client.on('interactionCreate', async interaction => {
                     portfolio[symbol] = (portfolio[symbol] || 0) + amount;
                     setUserPortfolio(user.id, portfolio);
 
-                    return interaction.reply({ content: `✅ Mua thành công **${amount} ${symbol}** với giá **${formatMoney(totalPrice)}**!`, ephemeral: true });
+                    return interaction.reply({ content: `✅ Mua thành công **${amount} ${symbol}** (${coin.name}) với giá **${formatMoney(totalPrice)}**!`, ephemeral: true });
                 } else {
                     const portfolio = getUserPortfolio(user.id);
                     const userOwned = portfolio[symbol] || 0;
@@ -674,11 +692,47 @@ client.on('interactionCreate', async interaction => {
                     setUserPortfolio(user.id, portfolio);
                     setBalance(user.id, getBalance(user.id) + totalReceive);
 
-                    return interaction.reply({ content: `✅ Bán thành công **${amount} ${symbol}**, nhận về **+${formatMoney(totalReceive)}**!`, ephemeral: true });
+                    return interaction.reply({ content: `✅ Bán thành công **${amount} ${symbol}** (${coin.name}), nhận về **+${formatMoney(totalReceive)}**!`, ephemeral: true });
                 }
             }
         }
 
+        // XỬ LÝ LỰA CHỌN TRONG STRING SELECT MENU
+        if (interaction.isStringSelectMenu()) {
+            const customId = interaction.customId;
+            const selectedSymbol = interaction.values[0];
+            const coin = cryptoMarket.coins[selectedSymbol];
+
+            if (customId === 'select_coin_buy' || customId === 'select_coin_sell') {
+                const isBuy = customId === 'select_coin_buy';
+                const modal = new ModalBuilder()
+                    .setCustomId(`modal_trade_${isBuy ? 'buy' : 'sell'}_${selectedSymbol}`)
+                    .setTitle(`${isBuy ? 'MUA' : 'BÁN'} ${selectedSymbol} (Giá: ${formatMoney(coin.price)})`);
+
+                const amountInput = new TextInputBuilder()
+                    .setCustomId('crypto_amount')
+                    .setLabel(`Nhập số lượng ${selectedSymbol} muốn giao dịch:`)
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('VD: 2')
+                    .setRequired(true);
+
+                modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
+                return interaction.showModal(modal);
+            }
+
+            if (customId === 'select_coin_chart') {
+                const chartUrl = getCryptoChartUrl(selectedSymbol, coin);
+                const embed = new EmbedBuilder()
+                    .setColor('Blurple')
+                    .setTitle(`📈 BIỂU ĐỒ GIÁ - ${coin.name} (${selectedSymbol})`)
+                    .setDescription(`Giá hiện tại: **${formatMoney(coin.price)}** | Biến động: **${coin.change > 0 ? '+' : ''}${coin.change}%**`)
+                    .setImage(chartUrl);
+
+                return interaction.reply({ embeds: [embed], ephemeral: true });
+            }
+        }
+
+        // XỬ LÝ 4 NÚT CHÍNH
         if (interaction.isButton()) {
             const customId = interaction.customId;
 
@@ -707,40 +761,19 @@ client.on('interactionCreate', async interaction => {
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
-            if (customId.startsWith('c_chart_')) {
-                const symbol = customId.split('_').pop();
-                const coin = cryptoMarket.coins[symbol];
-                if (!coin) return interaction.reply({ content: '❌ Không tìm thấy mã coin!', ephemeral: true });
-
-                const chartUrl = getCryptoChartUrl(symbol, coin);
-                const embed = new EmbedBuilder()
-                    .setColor('Blurple')
-                    .setTitle(`📈 BIỂU ĐỒ GIÁ - ${coin.name} (${symbol})`)
-                    .setDescription(`Giá hiện tại: **${formatMoney(coin.price)}** | Biến động: **${coin.change > 0 ? '+' : ''}${coin.change}%**`)
-                    .setImage(chartUrl);
-
-                return interaction.reply({ embeds: [embed], ephemeral: true });
+            if (customId === 'c_menu_buy') {
+                const row = getCoinSelectMenu('buy');
+                return interaction.reply({ content: '🛒 **Chọn đồng coin bạn muốn MUA:**', components: [row], ephemeral: true });
             }
 
-            if (customId.startsWith('c_buy_') || customId.startsWith('c_sell_')) {
-                const isBuy = customId.startsWith('c_buy_');
-                const symbol = customId.split('_').pop();
-                const coin = cryptoMarket.coins[symbol];
-                if (!coin) return interaction.reply({ content: '❌ Mã coin không tồn tại!', ephemeral: true });
+            if (customId === 'c_menu_sell') {
+                const row = getCoinSelectMenu('sell');
+                return interaction.reply({ content: '💰 **Chọn đồng coin bạn muốn BÁN:**', components: [row], ephemeral: true });
+            }
 
-                const modal = new ModalBuilder()
-                    .setCustomId(`modal_${customId}`)
-                    .setTitle(`${isBuy ? 'MUA' : 'BÁN'} ${symbol} (Giá: ${formatMoney(coin.price)})`);
-
-                const amountInput = new TextInputBuilder()
-                    .setCustomId('crypto_amount')
-                    .setLabel('Nhập số lượng muốn giao dịch:')
-                    .setStyle(TextInputStyle.Short)
-                    .setPlaceholder('VD: 2')
-                    .setRequired(true);
-
-                modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
-                return interaction.showModal(modal);
+            if (customId === 'c_menu_chart') {
+                const row = getCoinSelectMenu('chart');
+                return interaction.reply({ content: '📈 **Chọn đồng coin bạn muốn xem biểu đồ:**', components: [row], ephemeral: true });
             }
         }
 
@@ -996,7 +1029,7 @@ client.on('messageCreate', async message => {
             const embedMarket = new EmbedBuilder()
                 .setColor('Blurple')
                 .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO')
-                .setDescription(`*Chọn các nút bên dưới để thực hiện nhanh thao tác.*\n\n${marketText}`);
+                .setDescription(`*Chọn các nút bên dưới để thực hiện nhanh thao tác (Mua, Bán, Xem biểu đồ, Xem ví).*:\n\n${marketText}`);
 
             const row = getCrypto4ButtonsRow();
 
@@ -1149,7 +1182,7 @@ client.on('messageCreate', async message => {
                     },
                     { 
                         name: '📈 Chứng Khoán & Crypto', 
-                        value: '• `!coin`: Xem bảng giá thị trường kèm bảng nút bấm tương tác\n• `!coin chart <MÃ>`: Xem biểu đồ kỹ thuật trực tuyến (VD: `!coin chart BTC`)\n• `!coin vi`: Xem danh mục đầu tư coin của bạn', 
+                        value: '• `!coin`: Xem bảng giá thị trường kèm bảng 4 nút bấm tương tác gọn gàng\n• `!coin chart <MÃ>`: Xem biểu đồ kỹ thuật trực tuyến (VD: `!coin chart BTC`)\n• `!coin vi`: Xem danh mục đầu tư coin của bạn', 
                         inline: false 
                     },
                     { 
