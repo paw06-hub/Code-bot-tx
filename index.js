@@ -5,6 +5,7 @@ const {
 } = require('discord.js');
 const fs = require('fs');
 const express = require('express');
+const axios = require('axios'); // Dùng để đọc/tải file đính kèm khi import
 
 // ==========================================
 // 1. WEB SERVER GIỮ BOT SỐNG TRÊN RENDER
@@ -68,13 +69,13 @@ const saveJSONSync = (file, data) => {
 };
 
 // NẠP DỮ LIỆU TỪ FILE JSON KHI KHỞI ĐỘNG
-const balances = loadJSON(FILES.BALANCES);
-const customTitles = loadJSON(FILES.TITLES);
-const config = loadJSON(FILES.CONFIG, false);
-const wordConfig = loadJSON(FILES.WORD_CONFIG, false);
-const lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
-const lotteryData = loadJSON(FILES.LOTTERY, false);
-const staffList = loadJSON(FILES.STAFFS, false);
+let balances = loadJSON(FILES.BALANCES);
+let customTitles = loadJSON(FILES.TITLES);
+let config = loadJSON(FILES.CONFIG, false);
+let wordConfig = loadJSON(FILES.WORD_CONFIG, false);
+let lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
+let lotteryData = loadJSON(FILES.LOTTERY, false);
+let staffList = loadJSON(FILES.STAFFS, false);
 
 if (!lotteryData.tickets) lotteryData.tickets = [];
 if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
@@ -717,7 +718,7 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // 📦 BACKUP & RESTORE DỮ LIỆU ĐỂ TRÁNH MẤT SỐ DƯ KHI RENDER RESTART
+        // 📦 EXPORT BACKUP DỮ LIỆU SỐ DƯ & CẤU HÌNH
         if (command === 'exportdata' || command === 'backupdata') {
             if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền export dữ liệu!');
             
@@ -730,6 +731,55 @@ client.on('messageCreate', async message => {
 
             await message.author.send({ content: '📦 **Dữ liệu backup hiện tại của Bot:**', files: attachments }).catch(() => null);
             return message.reply('✅ Đã gửi toàn bộ file JSON lưu trữ số dư & dữ liệu vào tin nhắn riêng của bạn!');
+        }
+
+        // 📥 IMPORT/RESTORE KHÔI PHÚC DỮ LIỆU TỪ FILE DISCORD DÙNG CHO ADMIN
+        if (command === 'importdata' || command === 'restoredata') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền import khôi phục dữ liệu!');
+
+            const attachment = message.attachments.first();
+            if (!attachment) {
+                return message.reply('❌ Vui lòng **đính kèm (upload) file .json** backup cần khôi phục cùng với tin nhắn `!importdata`!');
+            }
+
+            const fileName = attachment.name;
+            let targetPath = null;
+
+            // Tự động nhận diện tên file để lưu vào đúng mục
+            if (fileName.includes('balances')) targetPath = FILES.BALANCES;
+            else if (fileName.includes('titles')) targetPath = FILES.TITLES;
+            else if (fileName.includes('config')) targetPath = FILES.CONFIG;
+            else if (fileName.includes('staffs')) targetPath = FILES.STAFFS;
+            else if (fileName.includes('lottery')) targetPath = FILES.LOTTERY;
+            else if (fileName.includes('word_config')) targetPath = FILES.WORD_CONFIG;
+            else if (fileName.includes('lode_config')) targetPath = FILES.LODE_CONFIG;
+
+            if (!targetPath) {
+                return message.reply('❌ File đính kèm không đúng định dạng tên! (Cần chứa một trong các tên: `balances.json`, `titles.json`, `staffs.json`, `config.json`,...)');
+            }
+
+            try {
+                // Tải dữ liệu từ Discord về
+                const response = await axios.get(attachment.url);
+                const importedData = response.data;
+
+                // Ghi đè vào ổ đĩa
+                fs.writeFileSync(targetPath, JSON.stringify(importedData, null, 2), 'utf8');
+
+                // Nạp lại biến RAM ngay lập tức
+                if (targetPath === FILES.BALANCES) balances = loadJSON(FILES.BALANCES);
+                if (targetPath === FILES.TITLES) customTitles = loadJSON(FILES.TITLES);
+                if (targetPath === FILES.CONFIG) config = loadJSON(FILES.CONFIG, false);
+                if (targetPath === FILES.STAFFS) staffList = loadJSON(FILES.STAFFS, false);
+                if (targetPath === FILES.LOTTERY) lotteryData = loadJSON(FILES.LOTTERY, false);
+                if (targetPath === FILES.WORD_CONFIG) wordConfig = loadJSON(FILES.WORD_CONFIG, false);
+                if (targetPath === FILES.LODE_CONFIG) lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
+
+                return message.reply(`✅ Khôi phục thành công dữ liệu cho file **${fileName}**! Hệ thống đã tự động cập nhật.`);
+            } catch (err) {
+                console.error('[Import Error]:', err);
+                return message.reply('❌ Lỗi khi tải hoặc ghi đè file dữ liệu! Vui lòng kiểm tra định dạng file JSON.');
+            }
         }
 
         // 🛠️ QUẢN LÝ DANH SÁCH STAFF
@@ -1034,7 +1084,7 @@ client.on('messageCreate', async message => {
                     { name: '💼 Kinh tế', value: '`!profile`, `!sodu`, `!daily`, `!work`, `!trom`, `!chuyen`, `!top`', inline: false },
                     { name: '🎲 Mini-Game', value: '• **Tài Xỉu:** Đặt trực tiếp qua nút bấm.\n• **Blackjack:** `!bj <tiền>`\n• **Nối Từ:** Nhập từ trong kênh game.\n• **Vé Số:** `!veso mua <6_chữ_số>`\n• **Lô Đề:** `!lode de/lo <2_chữ_số> <tiền>`\n• **KQXS:** `!ketqua`', inline: false },
                     { name: '🛡️ Quản trị Staff & Admin', value: '`!cong @user <tiền>`, `!tru @user <tiền>`, `!settaixiu`, `!setnoitu`, `!setlode`, `!noitu reset`', inline: false },
-                    { name: '👑 Bot Owner (Chủ Bot)', value: '`!addstaff @user`, `!delstaff @user`, `!stafflist`, `!resetmoney`, `!settitle`, `!forcedraw`, `!exportdata`', inline: false }
+                    { name: '👑 Bot Owner (Chủ Bot)', value: '`!addstaff @user`, `!delstaff @user`, `!stafflist`, `!resetmoney`, `!settitle`, `!forcedraw`, `!exportdata`, `!importdata` (Đính kèm file)', inline: false }
                 )
                 .setTimestamp();
 
