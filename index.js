@@ -921,7 +921,7 @@ client.on('messageCreate', async message => {
 
             const embedMarket = new EmbedBuilder()
                 .setColor('Blurple')
-                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO')
+                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ẢO')
                 .setDescription(`*Thị trường tự động cập nhật giá sau mỗi 2 phút.*\n\n${marketText}`)
                 .addFields(
                     { name: '📈 Xem biểu đồ', value: '`!coin chart <MÃ_COIN>`', inline: true },
