@@ -956,6 +956,60 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
+        // --- LỆNH IMPORT NHIỀU FILE DỮ LIỆU CÙNG LÚC ---
+        if (command === 'importdata') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền import dữ liệu!');
+            
+            const attachments = Array.from(message.attachments.values());
+            if (attachments.length === 0) {
+                return message.reply('❌ Vui lòng đính kèm ít nhất một file `.json` cần import kèm theo lệnh `!importdata`!');
+            }
+
+            let successCount = 0;
+            let failedFiles = [];
+
+            for (const att of attachments) {
+                const fileName = att.name.toLowerCase();
+                const matchedKey = Object.keys(FILES).find(key => FILES[key].toLowerCase().includes(fileName));
+
+                if (matchedKey) {
+                    try {
+                        const targetPath = FILES[matchedKey];
+                        const response = await axios.get(att.url, { responseType: 'text' });
+                        
+                        // Kiểm tra tính hợp lệ của JSON trước khi ghi đè
+                        JSON.parse(response.data); 
+                        fs.writeFileSync(targetPath, response.data, 'utf8');
+                        successCount++;
+                    } catch (e) {
+                        console.error(`[Import Error cho file ${fileName}]:`, e.message);
+                        failedFiles.push(fileName);
+                    }
+                } else {
+                    failedFiles.push(`${fileName} (không khớp tên hệ thống)`);
+                }
+            }
+
+            // Tải lại toàn bộ dữ liệu vào RAM ngay lập tức
+            balances = loadJSON(FILES.BALANCES);
+            customTitles = loadJSON(FILES.TITLES);
+            config = loadJSON(FILES.CONFIG, false);
+            wordConfig = loadJSON(FILES.WORD_CONFIG, false);
+            lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
+            lotteryData = loadJSON(FILES.LOTTERY, false);
+            staffList = loadJSON(FILES.STAFFS, false);
+            loans = loadJSON(FILES.LOANS);
+            cryptoMarket = loadJSON(FILES.CRYPTO, false);
+            portfolios = loadJSON(FILES.PORTFOLIO);
+
+            let replyMessage = `✅ Đã import thành công **${successCount}/${attachments.length}** file dữ liệu! Bot đã tự động nạp lại bộ nhớ RAM.`;
+            if (failedFiles.length > 0) {
+                replyMessage += `\n⚠️ Các file lỗi/không nhận diện: ${failedFiles.join(', ')}`;
+            }
+
+            return message.reply(replyMessage);
+        }
+
         if (['coin', 'crypto', 'chungkhoan'].includes(command)) {
             const subCmd = args[0]?.toLowerCase();
 
@@ -1192,7 +1246,7 @@ client.on('messageCreate', async message => {
                     },
                     { 
                         name: '⚙️ Lệnh Quản Trị & Cấu Hình (Admin / Staff)', 
-                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)', 
+                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
                         inline: false 
                     }
                 )
@@ -1205,12 +1259,10 @@ client.on('messageCreate', async message => {
             const targetUser = message.mentions.users.first() || message.author;
             const bal = getBalance(targetUser.id);
             
-            // Tính vị trí trên BXH Toàn Cầu
             const sortedBalances = Array.from(balances.entries()).sort((a, b) => b[1] - a[1]);
             const rankIndex = sortedBalances.findIndex(([id]) => id === targetUser.id);
             const rankText = rankIndex !== -1 ? `#${rankIndex + 1}` : 'Chưa xếp hạng';
 
-            // Lấy danh hiệu (Mặc định là "Chủ Tịch / Admin Tối Cao" nếu là Admin, hoặc tùy chỉnh)
             let titleText = customTitles.get(targetUser.id);
             if (!titleText) {
                 if (isBotOwner(targetUser.id)) {
