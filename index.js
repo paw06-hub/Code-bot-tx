@@ -32,7 +32,7 @@ const client = new Client({
 
 // CONFIGURATION
 const PREFIX = '!';
-const TOKEN = process.env.TOKEN || 'MTU1MzUxMjIxOTc4NDc3MzY1Mg.Gg7L0Q.yYGP13Si_QmKJdfwKd7pqZVNB63n87LYnhvu88';
+const TOKEN = process.env.TOKEN || 'YOUR_BOT_TOKEN_HERE';
 const ADMIN_ID = process.env.ADMIN_ID || '1498554147304247296'; 
 
 const FILES = {
@@ -80,13 +80,30 @@ const guildSessions = new Map();
 const bjGames = new Map();
 const wordGameSessions = new Map();
 
-// BỘ KIỂM TRA NGUYÊN ÂM & CẤU TRÚC TIẾNG VIỆT
-const VIETNAMESE_VOWELS = /[aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]/i;
+// BỘ LƯU CACHE TỪ ĐIỂN ĐỂ TRÁNH GỌI API Quá NHIỀU
+const dictionaryCache = new Map();
 
-function isValidVietnameseSyllable(syllable) {
-    if (!syllable || syllable.length === 0) return false;
-    if (!/^[a-zA-ZàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵđĐ]+$/.test(syllable)) return false;
-    return VIETNAMESE_VOWELS.test(syllable);
+// HÀM TRA CỨU TỪ ĐIỂN TIẾNG VIỆT VIA WIKTIONARY API
+async function checkVietnameseWordOnline(word) {
+    if (dictionaryCache.has(word)) return dictionaryCache.get(word);
+
+    try {
+        const url = `https://vi.wiktionary.org/w/api.php?action=query&titles=${encodeURIComponent(word)}&format=json`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const pages = data.query?.pages;
+        if (!pages) return false;
+
+        const pageId = Object.keys(pages)[0];
+        const isValid = pageId !== "-1"; // -1 nghĩa là từ này không tồn tại trên từ điển
+
+        dictionaryCache.set(word, isValid);
+        return isValid;
+    } catch (error) {
+        console.error("[Dictionary API Error]:", error);
+        return true; // Nếu API lỗi tạm thời thì cho qua để tránh gián đoạn cuộc chơi
+    }
 }
 
 // DANH SÁCH TỪ BẮT ĐẦU VÁN MỚI
@@ -118,7 +135,7 @@ const startWordGameTimeout = (guildId, channel) => {
         session.timeoutId = null;
 
         await channel.send(`⏳ **Đã quá 3 phút không có ai nối từ!** Ván cũ kết thúc.\n🔄 **Bắt đầu ván mới với từ:** **"${newWord}"**`).catch(() => {});
-    }, 180000); // 3 phút = 180.000 ms
+    }, 180000);
 };
 
 // HELPER FUNCTIONS
@@ -499,7 +516,7 @@ client.on('messageCreate', async message => {
     const userId = message.author.id;
 
     // ==========================================
-    // 3. GAME NỐI TỪ TIẾNG VIỆT
+    // 3. GAME NỐI TỪ TIẾNG VIỆT (ONLINE DICTIONARY)
     // ==========================================
     if (wordConfig[guildId] && message.channel.id === wordConfig[guildId]) {
         if (message.content.startsWith(PREFIX)) {
@@ -524,14 +541,8 @@ client.on('messageCreate', async message => {
         const inputWord = message.content.trim().toLowerCase();
         const wordParts = inputWord.split(/\s+/);
 
-        // 1. Kiểm tra từ ghép đúng 2 tiếng
+        // 1. Kiểm tra từ ghép phải đúng 2 tiếng
         if (wordParts.length !== 2) {
-            return message.react('❌');
-        }
-
-        // 2. Kiểm tra cấu trúc ngữ pháp từng tiếng trong từ ghép
-        if (!isValidVietnameseSyllable(wordParts[0]) || !isValidVietnameseSyllable(wordParts[1])) {
-            await message.reply(`❌ Từ **"${inputWord}"** chứa ký tự không phù hợp ngữ pháp Tiếng Việt!`);
             return message.react('❌');
         }
 
@@ -539,21 +550,28 @@ client.on('messageCreate', async message => {
         const lastWordParts = wordSession.currentWord.split(/\s+/);
         const requiredStartWord = lastWordParts[lastWordParts.length - 1]; // Tiếng cuối từ trước
 
-        // 3. Không cho phép 1 người tự nối từ của chính mình
+        // 2. Không cho phép 1 người tự nối từ của chính mình
         if (wordSession.lastUserId === userId) {
             await message.reply('⚠️ Lượt vừa rồi là của bạn! Hãy đợi người khác nối tiếp.');
             return message.react('❌');
         }
 
-        // 4. Kiểm tra từ có nối đúng tiếng không
+        // 3. Kiểm tra từ có nối đúng tiếng không
         if (wordParts[0] !== requiredStartWord) {
             await message.reply(`❌ Từ của bạn phải bắt đầu bằng chữ **"${requiredStartWord}"**! Từ hiện tại: **"${wordSession.currentWord}"**`);
             return message.react('❌');
         }
 
-        // 5. Kiểm tra xem từ đã từng dùng chưa
+        // 4. Kiểm tra xem từ đã từng dùng trong ván chưa
         if (wordSession.usedWords.has(inputWord)) {
             await message.reply(`❌ Từ **"${inputWord}"** đã được sử dụng trước đó rồi!`);
+            return message.react('❌');
+        }
+
+        // 5. KIỂM TRA TỪ ĐIỂN TIẾNG VIỆT ONLINE (API)
+        const isExistInDict = await checkVietnameseWordOnline(inputWord);
+        if (!isExistInDict) {
+            await message.reply(`❌ Từ **"${inputWord}"** không có trong từ điển Tiếng Việt hoặc vô nghĩa!`);
             return message.react('❌');
         }
 
