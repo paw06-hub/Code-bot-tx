@@ -98,7 +98,6 @@ if (!cryptoMarket.coins) {
 
 const cryptoAnnounceMessages = new Map();
 const dailyCooldown = new Map();
-const workCooldown = new Map();
 const guildSessions = new Map();
 const bjGames = new Map();
 const wordGameSessions = new Map();
@@ -185,9 +184,6 @@ const getCryptoChartUrl = (symbol, coin) => {
     return `https://quickchart.io/chart?w=500&h=250&bkg=#2f3136&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
 };
 
-// ==========================================
-// GIAO DIỆN 4 NÚT CHÍNH GỌN GÀNG (MUA, BÁN, BIỂU ĐỒ, VÍ)
-// ==========================================
 const getCrypto4ButtonsRow = () => {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('c_menu_buy').setLabel('🛒 Mua Coin').setStyle(ButtonStyle.Success),
@@ -598,9 +594,6 @@ client.once('ready', () => {
     scheduleCryptoMarket();
 });
 
-// ==========================================
-// 3. XỬ LÝ SỰ KIỆN TƯƠNG TÁC (NÚT BẤM, MENU & MODAL)
-// ==========================================
 client.on('interactionCreate', async interaction => {
     if (!interaction.guildId) return;
 
@@ -1131,6 +1124,17 @@ client.on('messageCreate', async message => {
             return message.reply(`✅ Đã thiết lập kênh Nối Từ tại ${targetChannel}.`);
         }
 
+        if (command === 'settitle') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền cấp danh hiệu!');
+            const targetUser = message.mentions.users.first();
+            const titleText = args.slice(1).join(' ');
+            if (!targetUser || !titleText) return message.reply('❌ Cú pháp: `!settitle @user <Tên danh hiệu>`');
+            
+            customTitles.set(targetUser.id, titleText);
+            saveJSONSync(FILES.TITLES, customTitles);
+            return message.reply(`✅ Đã cấp danh hiệu **"${titleText}"** cho ${targetUser}!`);
+        }
+
         if (command === 'blackjack' || command === 'bj') {
             const gameKey = `${guildId}_${userId}`;
             if (bjGames.has(gameKey)) return message.reply('❌ Bạn đang trong ván đấu khác!');
@@ -1139,7 +1143,7 @@ client.on('messageCreate', async message => {
             if (isNaN(bet) || bet <= 0) return message.reply('❌ Cú pháp: `!bj <số_tiền>`');
 
             const bal = getBalance(userId);
-            if (bet > bal) return message.reply(`❌ Số dư không đủ!`);
+            if (bet > bal) return message.reply('❌ Số dư không đủ!');
 
             const deck = createDeck();
             const playerHand = [deck.pop(), deck.pop()];
@@ -1173,7 +1177,7 @@ client.on('messageCreate', async message => {
                 .addFields(
                     { 
                         name: '💰 Tài Chính & Ngân Hàng', 
-                        value: '• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại\n• `!profile` (hoặc `!pf`): Xem hồ sơ chi tiết và tiền nợ\n• `!daily`: Điểm danh nhận quà hằng ngày (100.000đ)\n• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia\n• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%)\n• `!trano <số_tiền|all>`: Trả nợ ngân hàng', 
+                        value: '• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại\n• `!profile` (hoặc `!pf`): Xem hồ sơ chi tiết, BXH và danh hiệu\n• `!daily`: Điểm danh nhận quà hằng ngày (100.000đ)\n• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia\n• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%)\n• `!trano <số_tiền|all>`: Trả nợ ngân hàng', 
                         inline: false 
                     },
                     { 
@@ -1188,7 +1192,7 @@ client.on('messageCreate', async message => {
                     },
                     { 
                         name: '⚙️ Lệnh Quản Trị & Cấu Hình (Admin / Staff)', 
-                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)', 
+                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)', 
                         inline: false 
                     }
                 )
@@ -1200,13 +1204,32 @@ client.on('messageCreate', async message => {
         if (command === 'profile' || command === 'pf') {
             const targetUser = message.mentions.users.first() || message.author;
             const bal = getBalance(targetUser.id);
-            const loan = getLoan(targetUser.id);
+            
+            // Tính vị trí trên BXH Toàn Cầu
+            const sortedBalances = Array.from(balances.entries()).sort((a, b) => b[1] - a[1]);
+            const rankIndex = sortedBalances.findIndex(([id]) => id === targetUser.id);
+            const rankText = rankIndex !== -1 ? `#${rankIndex + 1}` : 'Chưa xếp hạng';
+
+            // Lấy danh hiệu (Mặc định là "Chủ Tịch / Admin Tối Cao" nếu là Admin, hoặc tùy chỉnh)
+            let titleText = customTitles.get(targetUser.id);
+            if (!titleText) {
+                if (isBotOwner(targetUser.id)) {
+                    titleText = '👑 Chủ Tịch / Admin Tối Cao';
+                } else if (isBotStaff(targetUser.id)) {
+                    titleText = '🛡️ Quản Trị Viên';
+                } else {
+                    titleText = '🌟 Thành Viên';
+                }
+            }
+
             const embed = new EmbedBuilder()
                 .setColor('Blurple')
                 .setTitle(`🪪 HỒ SƠ - ${targetUser.username}`)
+                .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
                 .addFields(
-                    { name: '💰 Số dư', value: `**${formatMoney(bal)}**`, inline: true },
-                    { name: '💳 Tiền nợ', value: `**${formatMoney(loan)}**`, inline: true }
+                    { name: '💲 Số dư', value: `**${formatMoney(bal)}**`, inline: false },
+                    { name: '🏆 BXH Toàn Cầu', value: `**${rankText}**`, inline: false },
+                    { name: '🎖️ Danh hiệu', value: `**${titleText}**`, inline: false }
                 );
             return message.reply({ embeds: [embed] });
         }
