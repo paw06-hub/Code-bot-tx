@@ -6,17 +6,17 @@ const fs = require('fs');
 const express = require('express');
 
 // ==========================================
-// 1. WEB SERVER GIỮ BOT SỐNG (RENDER HEALTH CHECK)
+// 1. TẠO WEB SERVER GIỮ BOT SỐNG TRÊN RENDER
 // ==========================================
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('Bot Discord Casino đang hoạt động bình thường trên Render!');
+    res.send('Bot Discord đang chạy trực tuyến trên Render!');
 });
 
 app.listen(PORT, () => {
-    console.log(`🌐 Web server HTTP đang mở tại port ${PORT}`);
+    console.log(`🌐 Web server HTTP đang mở tại port ${PORT} (Dành cho Render Health Check)`);
 });
 
 // ==========================================
@@ -30,20 +30,16 @@ const client = new Client({
     ]
 });
 
-// LẤY DỮ LIỆU BẢO MẬT TỪ BIẾN MÔI TRƯỜNG (ENVIRONMENT VARIABLES)
+// CONFIGURATION
 const PREFIX = '!';
-const TOKEN = process.env.TOKEN;
-const ADMIN_ID = process.env.ADMIN_ID; 
-
-if (!TOKEN) {
-    console.error('❌ LỖI KHỞI ĐỘNG: Chưa cài đặt TOKEN trong biến môi trường!');
-    process.exit(1);
-}
+const TOKEN = process.env.TOKEN || 'MTU1MzUxMjIxOTc4NDc3MzY1Mg.Gg7L0Q.yYGP13Si_QmKJdfwKd7pqZVNB63n87LYnhvu88';
+const ADMIN_ID = process.env.ADMIN_ID || '1498554147304247296'; 
 
 const FILES = {
     BALANCES: './balances.json',
     TITLES: './titles.json',
-    CONFIG: './config.json'
+    CONFIG: './config.json',
+    WORD_CONFIG: './word_config.json'
 };
 
 // DATA MANAGERS WITH BUFFERED WRITE
@@ -75,12 +71,29 @@ const saveJSON = (file, data) => {
 const balances = loadJSON(FILES.BALANCES);
 const customTitles = loadJSON(FILES.TITLES);
 const config = loadJSON(FILES.CONFIG, false);
+const wordConfig = loadJSON(FILES.WORD_CONFIG, false); // Lưu kênh Nối Từ
 
 const dailyCooldown = new Map();
 const workCooldown = new Map();
 const crimeCooldown = new Map();
 const guildSessions = new Map();
 const bjGames = new Map();
+const wordGameSessions = new Map(); // Quản lý game Nối từ [guildId => data]
+
+// START WORDS LIST FOR WORD GAME
+const START_WORDS = ['phát triển', 'học tập', 'máy tính', 'yêu thương', 'thành công', 'gia đình', 'hy vọng', 'tương lai', 'thành phố', 'văn hóa'];
+
+const getWordSession = (guildId) => {
+    if (!wordGameSessions.has(guildId)) {
+        const randomWord = START_WORDS[Math.floor(Math.random() * START_WORDS.length)];
+        wordGameSessions.set(guildId, {
+            currentWord: randomWord,
+            lastUserId: null,
+            usedWords: new Set([randomWord])
+        });
+    }
+    return wordGameSessions.get(guildId);
+};
 
 // HELPER FUNCTIONS
 const formatMoney = (amount) => Number(amount).toLocaleString('vi-VN') + 'đ';
@@ -454,13 +467,91 @@ async function finishBlackjackGame(interaction, gameKey, game) {
 }
 
 client.on('messageCreate', async message => {
-    if (message.author.bot || !message.guild || !message.content.startsWith(PREFIX)) return;
+    if (message.author.bot || !message.guild) return;
+
+    const guildId = message.guild.id;
+    const userId = message.author.id;
+
+    // ==========================================
+    // 3. GAME NỐI TỪ TIẾNG VIỆT
+    // ==========================================
+    if (wordConfig[guildId] && message.channel.id === wordConfig[guildId]) {
+        if (message.content.startsWith(PREFIX)) {
+            const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+            const cmd = args.shift().toLowerCase();
+            if (cmd === 'noitu' && args[0] === 'reset') {
+                const newWord = START_WORDS[Math.floor(Math.random() * START_WORDS.length)];
+                wordGameSessions.set(guildId, {
+                    currentWord: newWord,
+                    lastUserId: null,
+                    usedWords: new Set([newWord])
+                });
+                return message.reply(`🔄 Đã reset trò chơi nối từ! Từ bắt đầu mới: **"${newWord}"**`);
+            }
+        }
+
+        const inputWord = message.content.trim().toLowerCase();
+        const wordParts = inputWord.split(/\s+/);
+
+        // Kiểm tra từ ghép đúng 2 tiếng
+        if (wordParts.length !== 2) {
+            return message.react('❌');
+        }
+
+        const wordSession = getWordSession(guildId);
+        const lastWordParts = wordSession.currentWord.split(/\s+/);
+        const requiredStartWord = lastWordParts[lastWordParts.length - 1]; // Tiếng cuối từ trước
+
+        // Không cho phép 1 người tự nối từ của chính mình
+        if (wordSession.lastUserId === userId) {
+            await message.reply('⚠️ Lượt vừa rồi là của bạn! Hãy đợi người khác nối tiếp.');
+            return message.react('❌');
+        }
+
+        // Kiểm tra từ có nối đúng tiếng không
+        if (wordParts[0] !== requiredStartWord) {
+            await message.reply(`❌ Từ của bạn phải bắt đầu bằng chữ **"${requiredStartWord}"**! Từ hiện tại: **"${wordSession.currentWord}"**`);
+            return message.react('❌');
+        }
+
+        // Kiểm tra xem từ đã từng dùng chưa
+        if (wordSession.usedWords.has(inputWord)) {
+            await message.reply(`❌ Từ **"${inputWord}"** đã được sử dụng trước đó rồi!`);
+            return message.react('❌');
+        }
+
+        // Nối từ thành công
+        wordSession.currentWord = inputWord;
+        wordSession.lastUserId = userId;
+        wordSession.usedWords.add(inputWord);
+
+        const reward = 5000;
+        setBalance(userId, getBalance(userId) + reward);
+
+        await message.react('✅');
+        return;
+    }
+
+    // Các lệnh dùng Prefix `!`
+    if (!message.content.startsWith(PREFIX)) return;
 
     try {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
-        const userId = message.author.id;
-        const guildId = message.guild.id;
+
+        if (command === 'setnoitu') {
+            const isBotAdmin = userId === ADMIN_ID;
+            const isGuildAdmin = message.member.permissions.has('Administrator');
+
+            if (!isBotAdmin && !isGuildAdmin) return message.reply('❌ Bạn không có quyền Administrator!');
+
+            const targetChannel = message.mentions.channels.first() || message.channel;
+            wordConfig[guildId] = targetChannel.id;
+            saveJSON(FILES.WORD_CONFIG, wordConfig);
+
+            const session = getWordSession(guildId);
+            return message.reply(`✅ Đã thiết lập kênh Nối Từ tại ${targetChannel}.\n🔤 Từ khởi đầu hiện tại: **"${session.currentWord}"**`);
+        }
 
         if (command === 'blackjack' || command === 'bj') {
             const gameKey = `${guildId}_${userId}`;
@@ -556,8 +647,8 @@ client.on('messageCreate', async message => {
                 .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH')
                 .addFields(
                     { name: '💼 Kinh tế', value: '`!profile`, `!sodu`, `!daily`, `!work`, `!trom`, `!chuyen`, `!top`', inline: false },
-                    { name: '🎲 Mini-Game', value: '• **Tài Xỉu:** Bấm nút trực tiếp trong kênh cược.\n• **Blackjack:** `!bj <tiền_cược>` hoặc `!blackjack <tiền_cược>`', inline: false },
-                    { name: '👑 Admin Server', value: '`!settaixiu [#kênh]`', inline: false },
+                    { name: '🎲 Mini-Game', value: '• **Tài Xỉu:** Bấm nút trực tiếp trong kênh cược.\n• **Blackjack:** `!bj <tiền_cược>` hoặc `!blackjack <tiền_cược>`\n• **Nối Từ:** Nhập từ ghép trực tiếp vào kênh nối từ (Cộng +5.000đ/từ).', inline: false },
+                    { name: '👑 Admin Server', value: '`!settaixiu [#kênh]`, `!setnoitu [#kênh]`, `!noitu reset`', inline: false },
                     { name: '👑 Admin Bot', value: '`!cong`, `!tru`, `!resetmoney`, `!settitle`, `!resettitle`', inline: false }
                 )
                 .setFooter({ text: `Yêu cầu bởi ${message.author.username}`, iconURL: message.author.displayAvatarURL() })
