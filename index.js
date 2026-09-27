@@ -14,7 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('Bot Discord Casino & Game đang hoạt động!');
+    res.send('Bot Discord JangJii đang hoạt động!');
 });
 
 app.listen(PORT, () => {
@@ -158,7 +158,6 @@ const setUserPortfolio = (userId, portfolioData) => {
     saveJSONSync(FILES.PORTFOLIO, portfolios);
 };
 
-// HÀM TẠO URL BIỂU ĐỒ KỸ THUẬT SỐ (QUICKCHART API)
 const getCryptoChartUrl = (symbol, coin) => {
     const chartConfig = {
         type: 'line',
@@ -186,12 +185,13 @@ const getCryptoChartUrl = (symbol, coin) => {
     return `https://quickchart.io/chart?w=500&h=250&bkg=#2f3136&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
 };
 
-// HÀM TẠO ACTION ROW CHỨA CÁC NÚT: MUA, BÁN, BIỂU ĐỒ (CHO TỪNG COIN)
-const getCryptoButtonsRow = (symbol) => {
+// ĐÃ THU GỌN VỀ ĐÚNG 4 NÚT DUY NHẤT CHO GIAO DIỆN GỌN GÀNG
+const getCrypto4ButtonsRow = () => {
     return new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`c_buy_${symbol}`).setLabel(`🛒 Mua ${symbol}`).setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`c_sell_${symbol}`).setLabel(`💰 Bán ${symbol}`).setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId(`c_chart_${symbol}`).setLabel(`📈 Biểu đồ ${symbol}`).setStyle(ButtonStyle.Primary)
+        new ButtonBuilder().setCustomId('c_buy_BTC').setLabel('🛒 Mua BTC').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('c_sell_BTC').setLabel('💰 Bán BTC').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('c_chart_BTC').setLabel('📈 Biểu đồ BTC').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('c_portfolio').setLabel('💼 Xem Ví').setStyle(ButtonStyle.Secondary)
     );
 };
 
@@ -209,13 +209,7 @@ async function broadcastCryptoUpdate() {
         .setDescription(`*Giá thị trường vừa được cập nhật! Tự động làm mới sau mỗi 2 phút.*\n\n${marketText}`)
         .setTimestamp();
 
-    // Tạo thanh nút bấm mặc định cho mã BTC hoặc tổng quan (Ở đây gắn nút cho BTC hoặc danh mục chính)
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('c_buy_BTC').setLabel('🛒 Mua BTC').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('c_sell_BTC').setLabel('💰 Bán BTC').setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId('c_chart_BTC').setLabel('📈 Biểu đồ BTC').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('c_portfolio').setLabel('💼 Xem Ví').setStyle(ButtonStyle.Secondary)
-    );
+    const row = getCrypto4ButtonsRow();
 
     for (const [guildId, guildData] of Object.entries(config)) {
         if (typeof guildData === 'object' && guildData.cryptoChannelId) {
@@ -248,7 +242,6 @@ function updateCryptoPrices() {
         if (coin.history.length > 10) coin.history.shift();
     }
     saveJSONSync(FILES.CRYPTO, cryptoMarket);
-    console.log('📈 [Crypto Engine] Đã cập nhật giá thị trường coin!');
     broadcastCryptoUpdate();
 }
 
@@ -581,7 +574,7 @@ async function startTaiXiuLoop(guildId, channelId) {
 }
 
 client.once('ready', () => {
-    console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
+    console.log(`✅ Bot JangJii đã đăng nhập: ${client.user.tag}`);
     for (const [guildId, guildData] of Object.entries(config)) {
         const channelId = typeof guildData === 'string' ? guildData : guildData?.channelId;
         if (channelId) startTaiXiuLoop(guildId, channelId);
@@ -601,7 +594,6 @@ client.on('interactionCreate', async interaction => {
         const txSession = getSession(guildId);
         const targetChannelId = txSession.channelId;
 
-        // Xử lý nút Tài Xỉu
         if (interaction.isButton() && ['bet_tai', 'bet_xiu'].includes(interaction.customId)) {
             if (channelId !== targetChannelId) {
                 return interaction.reply({ content: '❌ Nút chỉ dùng trong kênh cược!', ephemeral: true });
@@ -646,7 +638,6 @@ client.on('interactionCreate', async interaction => {
                 return interaction.reply({ content: `✅ Đã cược **${formatMoney(bet)}** vào **${choice.toUpperCase()}**!`, ephemeral: true });
             }
 
-            // Xử lý modal nhập số lượng Mua/Bán Coin trực tiếp qua nút
             if (interaction.customId.startsWith('modal_c_buy_') || interaction.customId.startsWith('modal_c_sell_')) {
                 const isBuy = interaction.customId.includes('c_buy_');
                 const symbol = interaction.customId.split('_').pop();
@@ -688,11 +679,9 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // Xử lý các nút bấm Giao dịch Crypto trực tiếp từ Bảng tin hoặc Lệnh
         if (interaction.isButton()) {
             const customId = interaction.customId;
 
-            // Nút xem Ví
             if (customId === 'c_portfolio') {
                 const portfolio = getUserPortfolio(user.id);
                 const ownedKeys = Object.keys(portfolio);
@@ -718,7 +707,6 @@ client.on('interactionCreate', async interaction => {
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
-            // Nút Xem Biểu Đồ
             if (customId.startsWith('c_chart_')) {
                 const symbol = customId.split('_').pop();
                 const coin = cryptoMarket.coins[symbol];
@@ -734,7 +722,6 @@ client.on('interactionCreate', async interaction => {
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
-            // Nút Mua / Bán mở Modal nhập số lượng tương ứng
             if (customId.startsWith('c_buy_') || customId.startsWith('c_sell_')) {
                 const isBuy = customId.startsWith('c_buy_');
                 const symbol = customId.split('_').pop();
@@ -757,7 +744,6 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // Xử lý nút Blackjack
         if (interaction.isButton() && ['bj_hit', 'bj_stand'].includes(interaction.customId)) {
             const gameKey = `${guildId}_${user.id}`;
             const game = bjGames.get(gameKey);
@@ -948,7 +934,6 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // 📈 LỆNH COIN: TÍCH HỢP NÚT BẤM TRỰC TIẾP
         if (['coin', 'crypto', 'chungkhoan'].includes(command)) {
             const subCmd = args[0]?.toLowerCase();
 
@@ -960,11 +945,11 @@ client.on('messageCreate', async message => {
 
                 const coin = cryptoMarket.coins[symbol];
                 const chartUrl = getCryptoChartUrl(symbol, coin);
-                const row = getCryptoButtonsRow(symbol);
+                const row = getCrypto4ButtonsRow();
 
                 const embed = new EmbedBuilder()
                     .setColor('Blurple')
-                    .setTitle(`📈 BIỂU ĐỒ GIÁ TRỰC QUYẾN - ${coin.name} (${symbol})`)
+                    .setTitle(`📈 BIỂU ĐỒ GIÁ TRỰC TUYẾN - ${coin.name} (${symbol})`)
                     .setDescription(`Giá hiện tại: **${formatMoney(coin.price)}** | Biến động: **${coin.change > 0 ? '+' : ''}${coin.change}%**`)
                     .setImage(chartUrl);
 
@@ -1001,7 +986,6 @@ client.on('messageCreate', async message => {
                 return message.reply({ embeds: [embed] });
             }
 
-            // GỬI BẢNG GIÁ KÈM NÚT BẤM GIAO DỊCH NHANH CHO BTC, ETH, JNG
             let marketText = '';
             for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
                 const trendEmoji = coin.change > 0 ? '🟢 ▲' : (coin.change < 0 ? '🔴 ▼' : '🟡 ➖');
@@ -1011,29 +995,12 @@ client.on('messageCreate', async message => {
 
             const embedMarket = new EmbedBuilder()
                 .setColor('Blurple')
-                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO (TƯƠNG TÁC NHANH)')
-                .setDescription(`*Chọn các nút bên dưới để Mua, Bán hoặc xem Biểu đồ trực tiếp.*\n\n${marketText}`);
+                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO')
+                .setDescription(`*Chọn các nút bên dưới để thực hiện nhanh thao tác.*\n\n${marketText}`);
 
-            const row1 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('c_buy_BTC').setLabel('🛒 Mua BTC').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('c_sell_BTC').setLabel('💰 Bán BTC').setStyle(ButtonStyle.Danger),
-                new ButtonBuilder().setCustomId('c_chart_BTC').setLabel('📈 Biểu đồ BTC').setStyle(ButtonStyle.Primary)
-            );
+            const row = getCrypto4ButtonsRow();
 
-            const row2 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('c_buy_ETH').setLabel('🛒 Mua ETH').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('c_sell_ETH').setLabel('💰 Bán ETH').setStyle(ButtonStyle.Danger),
-                new ButtonBuilder().setCustomId('c_chart_ETH').setLabel('📈 Biểu đồ ETH').setStyle(ButtonStyle.Primary)
-            );
-
-            const row3 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('c_buy_JNG').setLabel('🛒 Mua JNG').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('c_sell_JNG').setLabel('💰 Bán JNG').setStyle(ButtonStyle.Danger),
-                new ButtonBuilder().setCustomId('c_chart_JNG').setLabel('📈 Biểu đồ JNG').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('c_portfolio').setLabel('💼 Xem Ví').setStyle(ButtonStyle.Secondary)
-            );
-
-            return message.reply({ embeds: [embedMarket], components: [row1, row2, row3] });
+            return message.reply({ embeds: [embedMarket], components: [row] });
         }
 
         if (command === 'setcoin') {
@@ -1044,10 +1011,9 @@ client.on('messageCreate', async message => {
             config[guildId].cryptoChannelId = targetChannel.id;
             saveJSONSync(FILES.CONFIG, config);
 
-            return message.reply(`✅ Đã thiết lập kênh thông báo biến động Crypto tự động tại ${targetChannel}.\n*(Bản tin sẽ đi kèm đầy đủ nút Mua/Bán/Biểu đồ và tự động xóa tin nhắn cũ!)*`);
+            return message.reply(`✅ Đã thiết lập kênh thông báo biến động Crypto tự động tại ${targetChannel}.`);
         }
 
-        // Lệnh Vay tiền, Trả nợ, Game khác giữ nguyên như bản trước...
         if (command === 'vay' || command === 'vaytien') {
             const amount = parseInt(args[0], 10);
             const currentDebt = getLoan(userId);
@@ -1170,14 +1136,35 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed], components: [row] });
         }
 
-        if (command === 'hlp' || command === 'giupde') {
+        if (command === 'hlp' || command === 'giupde' || command === 'help') {
             const embed = new EmbedBuilder()
                 .setColor('Random')
-                .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH BOT')
+                .setTitle('📖 BẢNG HƯỚNG DẪN TOÀN BỘ LỆNH JANGJII BOT')
+                .setDescription('Danh sách đầy đủ các lệnh giải trí, tài chính, giao dịch coin và cấu hình hệ thống:')
                 .addFields(
-                    { name: '📈 Chứng Khoán & Crypto', value: '• `!coin`: Xem bảng giá kèm các nút bấm tương tác (Mua, Bán, Biểu đồ trực tiếp)\n• `!coin chart <MÃ>`: Xem biểu đồ\n• `!coin vi`: Xem danh mục đầu tư', inline: false },
-                    { name: '⚙️ Cấu Hình', value: '• `!setcoin`: Kênh tự động báo giá coin (kèm nút bấm & tự xóa tin cũ)', inline: false }
-                );
+                    { 
+                        name: '💰 Tài Chính & Ví Tiền', 
+                        value: '• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại của bạn\n• `!profile` (hoặc `!pf`): Xem hồ sơ chi tiết (số dư, tiền nợ)\n• `!daily`: Điểm danh nhận quà hằng ngày (100.000đ)\n• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia\n• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%)\n• `!trano <số_tiền|all>`: Trả nợ ngân hàng', 
+                        inline: false 
+                    },
+                    { 
+                        name: '📈 Chứng Khoán & Crypto', 
+                        value: '• `!coin`: Xem bảng giá thị trường kèm bảng nút bấm tương tác\n• `!coin chart <MÃ>`: Xem biểu đồ kỹ thuật trực tuyến (VD: `!coin chart BTC`)\n• `!coin vi`: Xem danh mục đầu tư coin của bạn', 
+                        inline: false 
+                    },
+                    { 
+                        name: '🎲 Game Giải Trí & Cờ Bạc', 
+                        value: '• `!bj <số_tiền>` (hoặc `!blackjack`): Chơi game bài Blackjack (Xì Dách)\n• **Tài Xỉu:** Tham gia qua các nút bấm tương tác tự động tại kênh cấu hình\n• **Nối Từ:** Tham gia trực tiếp bằng cách gõ từ nối tiếp tại kênh Nối Từ\n• **Lô Đề / Vé Số:** Tự động quay thưởng vào 18:00 hằng ngày', 
+                        inline: false 
+                    },
+                    { 
+                        name: '⚙️ Lệnh Quản Trị & Cấu Hình (Admin/Staff)', 
+                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)', 
+                        inline: false 
+                    }
+                )
+                .setFooter({ text: 'JangJii Bot - Hệ thống giải trí và giao dịch trực tuyến' })
+                .setTimestamp();
             return message.reply({ embeds: [embed] });
         }
 
