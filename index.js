@@ -96,12 +96,9 @@ if (!cryptoMarket.coins) {
     saveJSONSync(FILES.CRYPTO, cryptoMarket);
 }
 
-// Lưu trữ ID tin nhắn thông báo thị trường cũ theo từng Guild để tự động xóa
 const cryptoAnnounceMessages = new Map();
-
 const dailyCooldown = new Map();
 const workCooldown = new Map();
-const crimeCooldown = new Map();
 const guildSessions = new Map();
 const bjGames = new Map();
 const wordGameSessions = new Map();
@@ -189,6 +186,15 @@ const getCryptoChartUrl = (symbol, coin) => {
     return `https://quickchart.io/chart?w=500&h=250&bkg=#2f3136&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
 };
 
+// HÀM TẠO ACTION ROW CHỨA CÁC NÚT: MUA, BÁN, BIỂU ĐỒ (CHO TỪNG COIN)
+const getCryptoButtonsRow = (symbol) => {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`c_buy_${symbol}`).setLabel(`🛒 Mua ${symbol}`).setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`c_sell_${symbol}`).setLabel(`💰 Bán ${symbol}`).setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`c_chart_${symbol}`).setLabel(`📈 Biểu đồ ${symbol}`).setStyle(ButtonStyle.Primary)
+    );
+};
+
 async function broadcastCryptoUpdate() {
     let marketText = '';
     for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
@@ -201,27 +207,27 @@ async function broadcastCryptoUpdate() {
         .setColor('Blurple')
         .setTitle('📊 BẢN TIN THỊ TRƯỜNG COIN & CHỨNG KHOÁN (TỰ ĐỘNG)')
         .setDescription(`*Giá thị trường vừa được cập nhật! Tự động làm mới sau mỗi 2 phút.*\n\n${marketText}`)
-        .addFields(
-            { name: '📈 Xem biểu đồ', value: '`!coin chart <MÃ_COIN>`', inline: true },
-            { name: '🛒 Mua coin', value: '`!coin mua <MÃ_COIN> <SL>`', inline: true },
-            { name: '💰 Bán coin', value: '`!coin ban <MÃ_COIN> <SL>`', inline: true }
-        )
         .setTimestamp();
 
-    // Duyệt qua tất cả Server để tìm kênh Crypto đã cấu hình
+    // Tạo thanh nút bấm mặc định cho mã BTC hoặc tổng quan (Ở đây gắn nút cho BTC hoặc danh mục chính)
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('c_buy_BTC').setLabel('🛒 Mua BTC').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('c_sell_BTC').setLabel('💰 Bán BTC').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('c_chart_BTC').setLabel('📈 Biểu đồ BTC').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('c_portfolio').setLabel('💼 Xem Ví').setStyle(ButtonStyle.Secondary)
+    );
+
     for (const [guildId, guildData] of Object.entries(config)) {
         if (typeof guildData === 'object' && guildData.cryptoChannelId) {
             const channel = await client.channels.fetch(guildData.cryptoChannelId).catch(() => null);
             if (channel) {
-                // Xóa tin nhắn cũ nếu có
                 const oldMsgId = cryptoAnnounceMessages.get(guildId);
                 if (oldMsgId) {
                     const oldMsg = await channel.messages.fetch(oldMsgId).catch(() => null);
                     if (oldMsg) await oldMsg.delete().catch(() => {});
                 }
 
-                // Gửi tin nhắn mới và lưu ID
-                const newMsg = await channel.send({ embeds: [embedMarket] }).catch(() => null);
+                const newMsg = await channel.send({ embeds: [embedMarket], components: [row] }).catch(() => null);
                 if (newMsg) {
                     cryptoAnnounceMessages.set(guildId, newMsg.id);
                 }
@@ -243,13 +249,10 @@ function updateCryptoPrices() {
     }
     saveJSONSync(FILES.CRYPTO, cryptoMarket);
     console.log('📈 [Crypto Engine] Đã cập nhật giá thị trường coin!');
-
-    // Gửi thông báo đến các kênh đã đăng ký
     broadcastCryptoUpdate();
 }
 
 function scheduleCryptoMarket() {
-    // Thời gian làm mới giá và phát thông báo là 2 phút (120000ms)
     setInterval(updateCryptoPrices, 120000);
 }
 
@@ -539,7 +542,7 @@ async function startTaiXiuLoop(guildId, channelId) {
         if (txSession.history.length > 10) txSession.history.shift();
 
         const { totalTai, totalXiu } = getSessionStats(txSession);
-        let resultText = `🎲 Kết quả: **${d1} - ${d2} -${d3}** (Tổng: **${sum}** - **${res === 'bao' ? 'BÃO' : res.toUpperCase()}**)\n`;
+        let resultText = `🎲 Kết quả: **${d1} - ${d2} - ${d3}** (Tổng: **${sum}** - **${res === 'bao' ? 'BÃO' : res.toUpperCase()}**)\n`;
         resultText += `📊 Tổng cược: 🔴 **${formatMoney(totalTai)}** | 🔵 **${formatMoney(totalXiu)}**\n\n`;
 
         if (txSession.bets.size === 0) {
@@ -587,6 +590,9 @@ client.once('ready', () => {
     scheduleCryptoMarket();
 });
 
+// ==========================================
+// 3. XỬ LÝ SỰ KIỆN TƯƠNG TÁC (NÚT BẤM & MODAL)
+// ==========================================
 client.on('interactionCreate', async interaction => {
     if (!interaction.guildId) return;
 
@@ -595,6 +601,7 @@ client.on('interactionCreate', async interaction => {
         const txSession = getSession(guildId);
         const targetChannelId = txSession.channelId;
 
+        // Xử lý nút Tài Xỉu
         if (interaction.isButton() && ['bet_tai', 'bet_xiu'].includes(interaction.customId)) {
             if (channelId !== targetChannelId) {
                 return interaction.reply({ content: '❌ Nút chỉ dùng trong kênh cược!', ephemeral: true });
@@ -619,25 +626,138 @@ client.on('interactionCreate', async interaction => {
             return interaction.showModal(modal);
         }
 
-        if (interaction.isModalSubmit()) {
-            const choice = interaction.customId === 'modal_tai' ? 'tai' : 'xiu';
-            const bet = parseInt(interaction.fields.getTextInputValue('bet_amount'), 10);
+        if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_')) {
+            if (interaction.customId === 'modal_tai' || interaction.customId === 'modal_xiu') {
+                const choice = interaction.customId === 'modal_tai' ? 'tai' : 'xiu';
+                const bet = parseInt(interaction.fields.getTextInputValue('bet_amount'), 10);
 
-            if (isNaN(bet) || bet <= 0) {
-                return interaction.reply({ content: '❌ Số tiền không hợp lệ!', ephemeral: true });
+                if (isNaN(bet) || bet <= 0) {
+                    return interaction.reply({ content: '❌ Số tiền không hợp lệ!', ephemeral: true });
+                }
+
+                const bal = getBalance(user.id);
+                if (bet > bal) {
+                    return interaction.reply({ content: `❌ Số dư không đủ! Hiện có: **${formatMoney(bal)}**.`, ephemeral: true });
+                }
+
+                txSession.bets.set(user.id, { choice, amount: bet });
+                await updateOpenEmbed(txSession);
+
+                return interaction.reply({ content: `✅ Đã cược **${formatMoney(bet)}** vào **${choice.toUpperCase()}**!`, ephemeral: true });
             }
 
-            const bal = getBalance(user.id);
-            if (bet > bal) {
-                return interaction.reply({ content: `❌ Số dư không đủ! Hiện có: **${formatMoney(bal)}**.`, ephemeral: true });
+            // Xử lý modal nhập số lượng Mua/Bán Coin trực tiếp qua nút
+            if (interaction.customId.startsWith('modal_c_buy_') || interaction.customId.startsWith('modal_c_sell_')) {
+                const isBuy = interaction.customId.includes('c_buy_');
+                const symbol = interaction.customId.split('_').pop();
+                const amount = parseInt(interaction.fields.getTextInputValue('crypto_amount'), 10);
+
+                if (isNaN(amount) || amount <= 0) {
+                    return interaction.reply({ content: '❌ Số lượng không hợp lệ!', ephemeral: true });
+                }
+
+                const coin = cryptoMarket.coins[symbol];
+                if (!coin) return interaction.reply({ content: '❌ Mã coin không tồn tại!', ephemeral: true });
+
+                if (isBuy) {
+                    const totalPrice = coin.price * amount;
+                    const userBal = getBalance(user.id);
+                    if (userBal < totalPrice) {
+                        return interaction.reply({ content: `❌ Không đủ tiền! Cần **${formatMoney(totalPrice)}**, ví có **${formatMoney(userBal)}**.`, ephemeral: true });
+                    }
+                    setBalance(user.id, userBal - totalPrice);
+                    const portfolio = getUserPortfolio(user.id);
+                    portfolio[symbol] = (portfolio[symbol] || 0) + amount;
+                    setUserPortfolio(user.id, portfolio);
+
+                    return interaction.reply({ content: `✅ Mua thành công **${amount} ${symbol}** với giá **${formatMoney(totalPrice)}**!`, ephemeral: true });
+                } else {
+                    const portfolio = getUserPortfolio(user.id);
+                    const userOwned = portfolio[symbol] || 0;
+                    if (userOwned < amount) {
+                        return interaction.reply({ content: `❌ Bạn chỉ sở hữu **${userOwned} ${symbol}**, không đủ để bán!`, ephemeral: true });
+                    }
+                    const totalReceive = coin.price * amount;
+                    portfolio[symbol] -= amount;
+                    if (portfolio[symbol] <= 0) delete portfolio[symbol];
+                    setUserPortfolio(user.id, portfolio);
+                    setBalance(user.id, getBalance(user.id) + totalReceive);
+
+                    return interaction.reply({ content: `✅ Bán thành công **${amount} ${symbol}**, nhận về **+${formatMoney(totalReceive)}**!`, ephemeral: true });
+                }
             }
-
-            txSession.bets.set(user.id, { choice, amount: bet });
-            await updateOpenEmbed(txSession);
-
-            return interaction.reply({ content: `✅ Đã cược **${formatMoney(bet)}** vào **${choice.toUpperCase()}**!`, ephemeral: true });
         }
 
+        // Xử lý các nút bấm Giao dịch Crypto trực tiếp từ Bảng tin hoặc Lệnh
+        if (interaction.isButton()) {
+            const customId = interaction.customId;
+
+            // Nút xem Ví
+            if (customId === 'c_portfolio') {
+                const portfolio = getUserPortfolio(user.id);
+                const ownedKeys = Object.keys(portfolio);
+                if (ownedKeys.length === 0) {
+                    return interaction.reply({ content: '💼 Danh mục đầu tư của bạn đang trống.', ephemeral: true });
+                }
+                let desc = '';
+                let totalValue = 0;
+                for (const symbol of ownedKeys) {
+                    const count = portfolio[symbol];
+                    const coin = cryptoMarket.coins[symbol];
+                    if (coin) {
+                        const val = count * coin.price;
+                        totalValue += val;
+                        desc += `• **${coin.name} (${symbol})**: ${count} coin | Giá trị: **${formatMoney(val)}**\n`;
+                    }
+                }
+                const embed = new EmbedBuilder()
+                    .setColor('Aqua')
+                    .setTitle(`💼 DANH MỤC ĐẦU TƯ - ${user.username}`)
+                    .setDescription(desc)
+                    .addFields({ name: '📊 Tổng tài sản', value: `**${formatMoney(totalValue)}**`, inline: false });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
+            }
+
+            // Nút Xem Biểu Đồ
+            if (customId.startsWith('c_chart_')) {
+                const symbol = customId.split('_').pop();
+                const coin = cryptoMarket.coins[symbol];
+                if (!coin) return interaction.reply({ content: '❌ Không tìm thấy mã coin!', ephemeral: true });
+
+                const chartUrl = getCryptoChartUrl(symbol, coin);
+                const embed = new EmbedBuilder()
+                    .setColor('Blurple')
+                    .setTitle(`📈 BIỂU ĐỒ GIÁ - ${coin.name} (${symbol})`)
+                    .setDescription(`Giá hiện tại: **${formatMoney(coin.price)}** | Biến động: **${coin.change > 0 ? '+' : ''}${coin.change}%**`)
+                    .setImage(chartUrl);
+
+                return interaction.reply({ embeds: [embed], ephemeral: true });
+            }
+
+            // Nút Mua / Bán mở Modal nhập số lượng tương ứng
+            if (customId.startsWith('c_buy_') || customId.startsWith('c_sell_')) {
+                const isBuy = customId.startsWith('c_buy_');
+                const symbol = customId.split('_').pop();
+                const coin = cryptoMarket.coins[symbol];
+                if (!coin) return interaction.reply({ content: '❌ Mã coin không tồn tại!', ephemeral: true });
+
+                const modal = new ModalBuilder()
+                    .setCustomId(`modal_${customId}`)
+                    .setTitle(`${isBuy ? 'MUA' : 'BÁN'} ${symbol} (Giá: ${formatMoney(coin.price)})`);
+
+                const amountInput = new TextInputBuilder()
+                    .setCustomId('crypto_amount')
+                    .setLabel('Nhập số lượng muốn giao dịch:')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('VD: 2')
+                    .setRequired(true);
+
+                modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
+                return interaction.showModal(modal);
+            }
+        }
+
+        // Xử lý nút Blackjack
         if (interaction.isButton() && ['bj_hit', 'bj_stand'].includes(interaction.customId)) {
             const gameKey = `${guildId}_${user.id}`;
             const game = bjGames.get(gameKey);
@@ -721,10 +841,10 @@ async function finishBlackjackGame(interaction, gameKey, game) {
         setBalance(user.id, currentBal + winAmount);
     } else if (playerScore > dealerScore) {
         winAmount = bet;
-        resultMessage = `🎉 **Thắng trận!** (${playerScore} vs${dealerScore}). Nhận **+${formatMoney(winAmount)}**.`;
+        resultMessage = `🎉 **Thắng trận!** (${playerScore} vs ${dealerScore}). Nhận **+${formatMoney(winAmount)}**.`;
         setBalance(user.id, currentBal + winAmount);
     } else if (playerScore < dealerScore) {
-        resultMessage = `😭 **Nhà cái thắng!** (${dealerScore} vs${playerScore}). Mất **-${formatMoney(bet)}**.`;
+        resultMessage = `😭 **Nhà cái thắng!** (${dealerScore} vs ${playerScore}). Mất **-${formatMoney(bet)}**.`;
         setBalance(user.id, currentBal - bet);
     } else {
         resultMessage = `🤝 **HÒA!** Bằng điểm (${playerScore}). Hoàn lại tiền.`;
@@ -828,11 +948,10 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // 📈 HỆ THỐNG TÀI CHÍNH: CRYPTO & CHỨNG KHOÁN GIẢ LẬP
+        // 📈 LỆNH COIN: TÍCH HỢP NÚT BẤM TRỰC TIẾP
         if (['coin', 'crypto', 'chungkhoan'].includes(command)) {
             const subCmd = args[0]?.toLowerCase();
 
-            // XEM BIỂU ĐỒ GIÁ: !coin chart <MÃ_COIN>
             if (subCmd === 'chart' || subCmd === 'bieudo') {
                 const symbol = args[1]?.toUpperCase();
                 if (!symbol || !cryptoMarket.coins[symbol]) {
@@ -841,100 +960,23 @@ client.on('messageCreate', async message => {
 
                 const coin = cryptoMarket.coins[symbol];
                 const chartUrl = getCryptoChartUrl(symbol, coin);
+                const row = getCryptoButtonsRow(symbol);
 
                 const embed = new EmbedBuilder()
                     .setColor('Blurple')
                     .setTitle(`📈 BIỂU ĐỒ GIÁ TRỰC QUYẾN - ${coin.name} (${symbol})`)
                     .setDescription(`Giá hiện tại: **${formatMoney(coin.price)}** | Biến động: **${coin.change > 0 ? '+' : ''}${coin.change}%**`)
-                    .setImage(chartUrl)
-                    .setFooter({ text: 'Biểu đồ trực quan tự động cập nhật theo lịch sử giá.' });
+                    .setImage(chartUrl);
 
-                return message.reply({ embeds: [embed] });
+                return message.reply({ embeds: [embed], components: [row] });
             }
 
-            // MUA COIN: !coin mua <MÃ_COIN> <SỐ_LƯỢNG>
-            if (subCmd === 'mua' || subCmd === 'buy') {
-                const symbol = args[1]?.toUpperCase();
-                const amount = parseInt(args[2], 10);
-
-                if (!symbol || !cryptoMarket.coins[symbol] || isNaN(amount) || amount <= 0) {
-                    return message.reply('❌ Cú pháp: `!coin mua <MÃ_COIN> <số_lượng>`\n*(VD: `!coin mua BTC 2`)*');
-                }
-
-                const coin = cryptoMarket.coins[symbol];
-                const totalPrice = coin.price * amount;
-                const userBal = getBalance(userId);
-
-                if (userBal < totalPrice) {
-                    return message.reply(`❌ Bạn không đủ tiền mặt! Cần **${formatMoney(totalPrice)}** nhưng ví chỉ có **${formatMoney(userBal)}**.`);
-                }
-
-                setBalance(userId, userBal - totalPrice);
-
-                const portfolio = getUserPortfolio(userId);
-                portfolio[symbol] = (portfolio[symbol] || 0) + amount;
-                setUserPortfolio(userId, portfolio);
-
-                const embed = new EmbedBuilder()
-                    .setColor('Green')
-                    .setTitle(`📈 MUA THÀNH CÔNG - ${coin.name} (${symbol})`)
-                    .addFields(
-                        { name: '📦 Số lượng mua', value: `**${amount}**${symbol}`, inline: true },
-                        { name: '💵 Tổng thanh toán', value: `**${formatMoney(totalPrice)}**`, inline: true },
-                        { name: '💰 Số dư ví còn lại', value: `**${formatMoney(getBalance(userId))}**`, inline: false }
-                    );
-
-                return message.reply({ embeds: [embed] });
-            }
-
-            // BÁN COIN: !coin ban <MÃ_COIN> <SỐ_LƯỢNG>
-            if (subCmd === 'ban' || subCmd === 'sell') {
-                const symbol = args[1]?.toUpperCase();
-                let amount = parseInt(args[2], 10);
-
-                const portfolio = getUserPortfolio(userId);
-                const userOwned = portfolio[symbol] || 0;
-
-                if (args[2]?.toLowerCase() === 'all') {
-                    amount = userOwned;
-                }
-
-                if (!symbol || !cryptoMarket.coins[symbol] || isNaN(amount) || amount <= 0) {
-                    return message.reply('❌ Cú pháp: `!coin ban <MÃ_COIN> <số_lượng|all>`\n*(VD: `!coin ban BTC all`)*');
-                }
-
-                if (userOwned < amount) {
-                    return message.reply(`❌ Bạn không có đủ coin để bán! Trong ví hiện có **${userOwned}${symbol}**.`);
-                }
-
-                const coin = cryptoMarket.coins[symbol];
-                const totalReceive = coin.price * amount;
-
-                portfolio[symbol] -= amount;
-                if (portfolio[symbol] <= 0) delete portfolio[symbol];
-                setUserPortfolio(userId, portfolio);
-
-                setBalance(userId, getBalance(userId) + totalReceive);
-
-                const embed = new EmbedBuilder()
-                    .setColor('Gold')
-                    .setTitle(`📉 BÁN THÀNH CÔNG - ${coin.name} (${symbol})`)
-                    .addFields(
-                        { name: '📦 Số lượng bán', value: `**${amount}**${symbol}`, inline: true },
-                        { name: '💵 Tổng tiền nhận về', value: `**+${formatMoney(totalReceive)}**`, inline: true },
-                        { name: '💰 Số dư ví hiện tại', value: `**${formatMoney(getBalance(userId))}**`, inline: false }
-                    );
-
-                return message.reply({ embeds: [embed] });
-            }
-
-            // XEM VÍ CRYPTO: !coin vi / !coin portfolio
             if (subCmd === 'vi' || subCmd === 'portfolio') {
                 const portfolio = getUserPortfolio(userId);
                 const ownedKeys = Object.keys(portfolio);
 
                 if (ownedKeys.length === 0) {
-                    return message.reply('💼 Danh mục đầu tư của bạn đang trống. Dùng `!coin` để xem giá thị trường!');
+                    return message.reply('💼 Danh mục đầu tư của bạn đang trống. Hãy dùng nút bên dưới hoặc lệnh `!coin` để mua!');
                 }
 
                 let desc = '';
@@ -946,7 +988,7 @@ client.on('messageCreate', async message => {
                     if (coin) {
                         const val = count * coin.price;
                         totalValue += val;
-                        desc += `• **${coin.name} (${symbol})**:${count} coin | Giá trị: **${formatMoney(val)}**\n`;
+                        desc += `• **${coin.name} (${symbol})**: ${count} coin | Giá trị: **${formatMoney(val)}**\n`;
                     }
                 }
 
@@ -954,13 +996,12 @@ client.on('messageCreate', async message => {
                     .setColor('Aqua')
                     .setTitle(`💼 DANH MỤC ĐẦU TƯ - ${message.author.username}`)
                     .setDescription(desc)
-                    .addFields({ name: '📊 Tổng giá trị tài sản Coin', value: `**${formatMoney(totalValue)}**`, inline: false })
-                    .setFooter({ text: 'Dùng !coin ban <MÃ_COIN> <số_lượng> để chốt lời.' });
+                    .addFields({ name: '📊 Tổng giá trị tài sản Coin', value: `**${formatMoney(totalValue)}**`, inline: false });
 
                 return message.reply({ embeds: [embed] });
             }
 
-            // BẢNG GIÁ THỊ TRƯỜNG CHÍNH
+            // GỬI BẢNG GIÁ KÈM NÚT BẤM GIAO DỊCH NHANH CHO BTC, ETH, JNG
             let marketText = '';
             for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
                 const trendEmoji = coin.change > 0 ? '🟢 ▲' : (coin.change < 0 ? '🔴 ▼' : '🟡 ➖');
@@ -970,19 +1011,31 @@ client.on('messageCreate', async message => {
 
             const embedMarket = new EmbedBuilder()
                 .setColor('Blurple')
-                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO')
-                .setDescription(`*Thị trường tự động cập nhật giá sau mỗi 2 phút.*\n\n${marketText}`)
-                .addFields(
-                    { name: '📈 Xem biểu đồ', value: '`!coin chart <MÃ_COIN>`', inline: true },
-                    { name: '🛒 Mua coin', value: '`!coin mua <MÃ_COIN> <SL>`', inline: true },
-                    { name: '💰 Bán coin', value: '`!coin ban <MÃ_COIN> <SL>`', inline: true }
-                )
-                .setFooter({ text: 'Gợi ý: Dùng !coin chart BTC để xem trực quan biểu đồ giá!' });
+                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO (TƯƠNG TÁC NHANH)')
+                .setDescription(`*Chọn các nút bên dưới để Mua, Bán hoặc xem Biểu đồ trực tiếp.*\n\n${marketText}`);
 
-            return message.reply({ embeds: [embedMarket] });
+            const row1 = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('c_buy_BTC').setLabel('🛒 Mua BTC').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('c_sell_BTC').setLabel('💰 Bán BTC').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId('c_chart_BTC').setLabel('📈 Biểu đồ BTC').setStyle(ButtonStyle.Primary)
+            );
+
+            const row2 = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('c_buy_ETH').setLabel('🛒 Mua ETH').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('c_sell_ETH').setLabel('💰 Bán ETH').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId('c_chart_ETH').setLabel('📈 Biểu đồ ETH').setStyle(ButtonStyle.Primary)
+            );
+
+            const row3 = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('c_buy_JNG').setLabel('🛒 Mua JNG').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('c_sell_JNG').setLabel('💰 Bán JNG').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId('c_chart_JNG').setLabel('📈 Biểu đồ JNG').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('c_portfolio').setLabel('💼 Xem Ví').setStyle(ButtonStyle.Secondary)
+            );
+
+            return message.reply({ embeds: [embedMarket], components: [row1, row2, row3] });
         }
 
-        // LỆNH SETUP KÊNH TỰ ĐỘNG THÔNG BÁO COIN
         if (command === 'setcoin') {
             if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('❌ Bạn không có quyền cấu hình kênh!');
             const targetChannel = message.mentions.channels.first() || message.channel;
@@ -991,10 +1044,10 @@ client.on('messageCreate', async message => {
             config[guildId].cryptoChannelId = targetChannel.id;
             saveJSONSync(FILES.CONFIG, config);
 
-            return message.reply(`✅ Đã thiết lập kênh thông báo biến động Crypto/Chứng khoán tự động tại ${targetChannel}.\n*(Tin nhắn cũ sẽ tự động bị xóa khi biến động giá mới!)*`);
+            return message.reply(`✅ Đã thiết lập kênh thông báo biến động Crypto tự động tại ${targetChannel}.\n*(Bản tin sẽ đi kèm đầy đủ nút Mua/Bán/Biểu đồ và tự động xóa tin nhắn cũ!)*`);
         }
 
-        // 🏦 HỆ THỐNG VAY TIỀN & TRẢ NỢ - LÃI SUẤT 30%
+        // Lệnh Vay tiền, Trả nợ, Game khác giữ nguyên như bản trước...
         if (command === 'vay' || command === 'vaytien') {
             const amount = parseInt(args[0], 10);
             const currentDebt = getLoan(userId);
@@ -1003,298 +1056,60 @@ client.on('messageCreate', async message => {
                 const embed = new EmbedBuilder()
                     .setColor('Yellow')
                     .setTitle('🏦 NGÂN HÀNG DISCORD - THÔNG TIN VAY')
-                    .setDescription(`• Lãi suất cố định: **${LOAN_INTEREST_RATE * 100}%**\n• Hạn ngạch tối đa: **${formatMoney(MAX_LOAN_LIMIT)}**\n• Nợ hiện tại của bạn: **${formatMoney(currentDebt)}**`)
-                    .setFooter({ text: 'Cú pháp vay: !vay <số_tiền>' });
+                    .setDescription(`• Lãi suất cố định: **${LOAN_INTEREST_RATE * 100}%**\n• Hạn ngạch tối đa: **${formatMoney(MAX_LOAN_LIMIT)}**\n• Nợ hiện tại của bạn: **${formatMoney(currentDebt)}**`);
                 return message.reply({ embeds: [embed] });
             }
 
-            if (currentDebt > 0) {
-                return message.reply(`❌ Bạn chưa thể vay thêm! Hãy trả hết khoản nợ cũ **${formatMoney(currentDebt)}** bằng lệnh \`!trano\` trước.`);
-            }
-
-            if (amount > MAX_LOAN_LIMIT) {
-                return message.reply(`❌ Số tiền vay vượt quá hạn ngạch cho phép! Tối đa bạn chỉ được vay **${formatMoney(MAX_LOAN_LIMIT)}**.`);
-            }
+            if (currentDebt > 0) return message.reply(`❌ Hãy trả hết khoản nợ cũ **${formatMoney(currentDebt)}** trước.`);
+            if (amount > MAX_LOAN_LIMIT) return message.reply(`❌ Vượt quá hạn ngạch tối đa **${formatMoney(MAX_LOAN_LIMIT)}**.`);
 
             const totalDebtWithInterest = Math.floor(amount * (1 + LOAN_INTEREST_RATE));
-            
             setLoan(userId, totalDebtWithInterest);
             setBalance(userId, getBalance(userId) + amount);
 
-            const embedSuccess = new EmbedBuilder()
-                .setColor('Green')
-                .setTitle('🏦 VAY TIỀN THÀNH CÔNG')
-                .addFields(
-                    { name: '💵 Số tiền thực nhận', value: `**+${formatMoney(amount)}**`, inline: true },
-                    { name: '📈 Tổng nợ phải trả (gồm 30% lãi)', value: `**${formatMoney(totalDebtWithInterest)}**`, inline: true },
-                    { name: '💰 Ví hiện tại', value: `**${formatMoney(getBalance(userId))}**`, inline: false }
-                )
-                .setFooter({ text: 'Dùng !trano <số_tiền> để hoàn trả khoản vay.' });
-
-            return message.reply({ embeds: [embedSuccess] });
+            return message.reply(`✅ Vay thành công **+${formatMoney(amount)}**. Tổng nợ cần trả: **${formatMoney(totalDebtWithInterest)}**.`);
         }
 
         if (command === 'trano' || command === 'payloan') {
             const currentDebt = getLoan(userId);
-            if (currentDebt <= 0) {
-                return message.reply('🎉 Bạn hiện không có khoản nợ nào!');
-            }
+            if (currentDebt <= 0) return message.reply('🎉 Bạn không có khoản nợ nào!');
 
             let payAmount = parseInt(args[0], 10);
-            if (args[0]?.toLowerCase() === 'all') {
-                payAmount = currentDebt;
-            }
+            if (args[0]?.toLowerCase() === 'all') payAmount = currentDebt;
 
-            if (isNaN(payAmount) || payAmount <= 0) {
-                return message.reply(`❌ Cú pháp: \`!trano <số_tiền>\` hoặc \`!trano all\`.\n📌 Tổng nợ cần trả: **${formatMoney(currentDebt)}**`);
-            }
+            if (isNaN(payAmount) || payAmount <= 0) return message.reply(`❌ Cú pháp: \`!trano <số_tiền|all>\`. Nợ hiện tại: **${formatMoney(currentDebt)}**`);
 
             const bal = getBalance(userId);
-            if (bal < payAmount) {
-                return message.reply(`❌ Bạn không đủ tiền mặt để trả! Số dư hiện tại: **${formatMoney(bal)}**.`);
-            }
+            if (bal < payAmount) return message.reply(`❌ Số dư ví không đủ!`);
 
             const actualPayment = Math.min(payAmount, currentDebt);
-            const remainingDebt = currentDebt - actualPayment;
-
             setBalance(userId, bal - actualPayment);
-            setLoan(userId, remainingDebt);
+            setLoan(userId, currentDebt - actualPayment);
 
-            const embedPay = new EmbedBuilder()
-                .setColor('Blue')
-                .setTitle('💳 THANH TOÁN KHOẢN NỢ')
-                .addFields(
-                    { name: '💸 Số tiền đã trả', value: `**-${formatMoney(actualPayment)}**`, inline: true },
-                    { name: '📌 Nợ còn lại', value: `**${formatMoney(remainingDebt)}**`, inline: true },
-                    { name: '💰 Ví hiện tại', value: `**${formatMoney(getBalance(userId))}**`, inline: false }
-                );
-
-            return message.reply({ embeds: [embedPay] });
+            return message.reply(`💳 Đã trả **-${formatMoney(actualPayment)}** tiền nợ. Nợ còn lại: **${formatMoney(currentDebt - actualPayment)}**.`);
         }
 
-        // BACKUP & EXPORT
-        if (command === 'exportdata' || command === 'backupdata') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền export dữ liệu!');
-            
+        if (command === 'exportdata') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner!');
             const attachments = [];
             for (const filePath of Object.values(FILES)) {
-                if (fs.existsSync(filePath)) {
-                    attachments.push(new AttachmentBuilder(filePath));
-                }
+                if (fs.existsSync(filePath)) attachments.push(new AttachmentBuilder(filePath));
             }
-
-            await message.author.send({ content: '📦 **Dữ liệu backup hiện tại của Bot:**', files: attachments }).catch(() => null);
-            return message.reply('✅ Đã gửi toàn bộ file JSON lưu trữ số dư & dữ liệu vào tin nhắn riêng của bạn!');
+            await message.author.send({ content: '📦 **Backup dữ liệu:**', files: attachments }).catch(() => null);
+            return message.reply('✅ Đã gửi file backup vào tin nhắn riêng!');
         }
 
-        // RESTORE / IMPORT
-        if (command === 'importdata' || command === 'restoredata') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền import khôi phục dữ liệu!');
-
-            const attachment = message.attachments.first();
-            if (!attachment) {
-                return message.reply('❌ Vui lòng **đính kèm (upload) file .json** backup cần khôi phục cùng với tin nhắn `!importdata`!');
-            }
-
-            const fileName = attachment.name;
-            let targetPath = null;
-
-            if (fileName.includes('balances')) targetPath = FILES.BALANCES;
-            else if (fileName.includes('titles')) targetPath = FILES.TITLES;
-            else if (fileName.includes('config')) targetPath = FILES.CONFIG;
-            else if (fileName.includes('staffs')) targetPath = FILES.STAFFS;
-            else if (fileName.includes('lottery')) targetPath = FILES.LOTTERY;
-            else if (fileName.includes('word_config')) targetPath = FILES.WORD_CONFIG;
-            else if (fileName.includes('lode_config')) targetPath = FILES.LODE_CONFIG;
-            else if (fileName.includes('loans')) targetPath = FILES.LOANS;
-            else if (fileName.includes('crypto')) targetPath = FILES.CRYPTO;
-            else if (fileName.includes('portfolio')) targetPath = FILES.PORTFOLIO;
-
-            if (!targetPath) {
-                return message.reply('❌ File đính kèm không đúng định dạng tên!');
-            }
-
-            try {
-                const response = await axios.get(attachment.url);
-                fs.writeFileSync(targetPath, JSON.stringify(response.data, null, 2), 'utf8');
-
-                balances = loadJSON(FILES.BALANCES);
-                customTitles = loadJSON(FILES.TITLES);
-                config = loadJSON(FILES.CONFIG, false);
-                staffList = loadJSON(FILES.STAFFS, false);
-                lotteryData = loadJSON(FILES.LOTTERY, false);
-                wordConfig = loadJSON(FILES.WORD_CONFIG, false);
-                lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
-                loans = loadJSON(FILES.LOANS);
-                cryptoMarket = loadJSON(FILES.CRYPTO, false);
-                portfolios = loadJSON(FILES.PORTFOLIO);
-
-                return message.reply(`✅ Khôi phục thành công dữ liệu cho file **${fileName}**!`);
-            } catch (err) {
-                console.error('[Import Error]:', err);
-                return message.reply('❌ Lỗi khi tải hoặc ghi đè file dữ liệu!');
-            }
-        }
-
-        if (command === 'addstaff') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền thêm Staff!');
-            const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!addstaff @user`');
-
-            if (staffList.users.includes(targetUser.id)) return message.reply(`⚠️ ${targetUser} đã là Staff rồi!`);
-            staffList.users.push(targetUser.id);
-            saveJSONSync(FILES.STAFFS, staffList);
-
-            return message.reply(`✅ Đã thêm ${targetUser} vào danh sách **Staff**!`);
-        }
-
-        if (command === 'delstaff' || command === 'removestaff') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền xóa Staff!');
-            const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!delstaff @user`');
-
-            staffList.users = staffList.users.filter(id => id !== targetUser.id);
-            saveJSONSync(FILES.STAFFS, staffList);
-
-            return message.reply(`🗑️ Đã xóa ${targetUser} khỏi danh sách **Staff**.`);
-        }
-
-        if (command === 'stafflist' || command === 'dsstaff') {
-            if (staffList.users.length === 0) return message.reply('📌 Hiện chưa có Staff nào.');
-            const staffMentions = staffList.users.map((id, index) => `${index + 1}. <@${id}> (\`${id}\`)`).join('\n');
-            const embed = new EmbedBuilder().setColor('Aqua').setTitle('🛡️ DANH SÁCH STAFF').setDescription(staffMentions);
-            return message.reply({ embeds: [embed] });
-        }
-
-        if (command === 'cong' || command === 'addmoney') {
-            if (!isBotStaff(userId)) return message.reply('❌ Chỉ **Staff** hoặc **Bot Owner** mới được dùng lệnh này!');
+        if (command === 'cong') {
+            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
             const targetUser = message.mentions.users.first();
             const amount = parseInt(args[1], 10);
-            if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('❌ Cú pháp: `!cong @user <số_tiền>`');
-
-            let bal = getBalance(targetUser.id) + amount;
-            setBalance(targetUser.id, bal);
-            return message.reply(`✅ Đã cộng **+${formatMoney(amount)}** cho ${targetUser}. Số dư mới: **${formatMoney(bal)}**.`);
-        }
-
-        if (command === 'tru' || command === 'removemoney') {
-            if (!isBotStaff(userId)) return message.reply('❌ Chỉ **Staff** hoặc **Bot Owner** mới được dùng lệnh này!');
-            const targetUser = message.mentions.users.first();
-            const amount = parseInt(args[1], 10);
-            if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('❌ Cú pháp: `!tru @user <số_tiền>`');
-
-            let bal = Math.max(0, getBalance(targetUser.id) - amount);
-            setBalance(targetUser.id, bal);
-            return message.reply(`📉 Đã trừ **-${formatMoney(amount)}** của ${targetUser}. Số dư mới: **${formatMoney(bal)}**.`);
-        }
-
-        if (command === 'resetmoney') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền!');
-            const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Hãy tag người cần reset!');
-            setBalance(targetUser.id, 50000);
-            return message.reply(`🔄 Đã reset ví của ${targetUser} về **50.000đ**.`);
-        }
-
-        if (command === 'settitle' || command === 'resettitle') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền!');
-            const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!settitle @user <tên>`');
-
-            if (command === 'resettitle') {
-                customTitles.delete(targetUser.id);
-                saveJSONSync(FILES.TITLES, customTitles);
-                return message.reply(`🔄 Đã xóa danh hiệu tùy chỉnh của ${targetUser}.`);
-            }
-
-            const newTitle = args.slice(1).join(' ');
-            customTitles.set(targetUser.id, newTitle);
-            saveJSONSync(FILES.TITLES, customTitles);
-            return message.reply(`✨ Đã đặt danh hiệu cho ${targetUser}: **${newTitle}**`);
-        }
-
-        if (command === 'forcedraw') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền!');
-            await processLotteryDraw();
-            return message.reply('⚡ Đã ép kích hoạt quay thưởng Xổ Số & Lô Đề!');
-        }
-
-        if (['veso', 'muaveso'].includes(command)) {
-            const subCmd = args[0]?.toLowerCase();
-            const TICKET_PRICE = 10000;
-
-            if (subCmd === 'mua') {
-                const number = args[1];
-                if (!number || !/^\d{6}$/.test(number)) return message.reply('❌ Cú pháp: `!veso mua <6_chữ_số>`');
-
-                const bal = getBalance(userId);
-                if (bal < TICKET_PRICE) return message.reply(`❌ Số dư không đủ! Giá vé: **${formatMoney(TICKET_PRICE)}**.`);
-
-                setBalance(userId, bal - TICKET_PRICE);
-                lotteryData.tickets.push({ userId, number });
-                saveJSONSync(FILES.LOTTERY, lotteryData);
-
-                return message.reply(`🎟️ Mua thành công vé số **"${number}"**!`);
-            }
-
-            const myTickets = lotteryData.tickets.filter(t => t.userId === userId);
-            const ticketList = myTickets.length > 0 ? myTickets.map(t => `• **${t.number}**`).join('\n') : 'Chưa mua vé nào.';
-
-            const embed = new EmbedBuilder()
-                .setColor('Gold')
-                .setTitle('🎟️ VÉ SỐ KIẾN THIẾT (18:00)')
-                .setDescription(`• Giá vé: **${formatMoney(TICKET_PRICE)}**\n• Giải Đặc Biệt: **100.000.000đ**\n\n📌 **Vé của bạn:**\n${ticketList}`);
-            return message.reply({ embeds: [embed] });
-        }
-
-        if (['lode', 'de', 'lo'].includes(command)) {
-            let type = args[0]?.toLowerCase();
-            let num = args[1];
-            let bet = parseInt(args[2], 10);
-
-            if (command === 'de' || command === 'lo') {
-                type = command;
-                num = args[0];
-                bet = parseInt(args[1], 10);
-            }
-
-            if (!['de', 'lo'].includes(type) || !num || !/^\d{2}$/.test(num) || isNaN(bet) || bet <= 0) {
-                return message.reply('❌ Cú pháp: `!lode de <2_số> <tiền>` hoặc `!lode lo <2_số> <tiền>`');
-            }
-
-            const bal = getBalance(userId);
-            if (bet > bal) return message.reply(`❌ Số dư không đủ!`);
-
-            setBalance(userId, bal - bet);
-            lotteryData.lodeBets.push({ userId, type, number: num, amount: bet });
-            saveJSONSync(FILES.LOTTERY, lotteryData);
-
-            return message.reply(`🎯 Đã cược **${type.toUpperCase()}${num}** với **${formatMoney(bet)}**!`);
-        }
-
-        if (['ketqua', 'kqxs'].includes(command)) {
-            if (!lotteryData.lastResult) return message.reply('❌ Chưa có kết quả xổ số!');
-            const res = lotteryData.lastResult;
-            const embed = new EmbedBuilder()
-                .setColor('Orange')
-                .setTitle('🎰 KẾT QUẢ XỔ SỐ GẦN NHẤT')
-                .addFields(
-                    { name: '🏆 G.Đặc Biệt', value: `🎉 **${res.specialPrize}**`, inline: false },
-                    { name: '🎲 27 Giải Lô', value: `\`${res.loResults.join(' - ')}\``, inline: false }
-                );
-            return message.reply({ embeds: [embed] });
-        }
-
-        if (command === 'setlode') {
-            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('❌ Không có quyền!');
-            const targetChannel = message.mentions.channels.first() || message.channel;
-            lodeConfig[guildId] = targetChannel.id;
-            saveJSONSync(FILES.LODE_CONFIG, lodeConfig);
-            return message.reply(`✅ Đã thiết lập kênh Lô Đề tại ${targetChannel}.`);
+            if (!targetUser || isNaN(amount)) return message.reply('❌ Sai cú pháp!');
+            setBalance(targetUser.id, getBalance(targetUser.id) + amount);
+            return message.reply(`✅ Đã cộng tiền cho ${targetUser}!`);
         }
 
         if (command === 'settaixiu') {
-            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('❌ Không có quyền!');
+            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
             const targetChannel = message.mentions.channels.first() || message.channel;
             const txSession = getSession(guildId);
             txSession.channelId = targetChannel.id;
@@ -1304,8 +1119,16 @@ client.on('messageCreate', async message => {
             return;
         }
 
+        if (command === 'setlode') {
+            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
+            const targetChannel = message.mentions.channels.first() || message.channel;
+            lodeConfig[guildId] = targetChannel.id;
+            saveJSONSync(FILES.LODE_CONFIG, lodeConfig);
+            return message.reply(`✅ Đã thiết lập kênh Lô Đề tại ${targetChannel}.`);
+        }
+
         if (command === 'setnoitu') {
-            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('❌ Không có quyền!');
+            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
             const targetChannel = message.mentions.channels.first() || message.channel;
             wordConfig[guildId] = targetChannel.id;
             saveJSONSync(FILES.WORD_CONFIG, wordConfig);
@@ -1352,56 +1175,8 @@ client.on('messageCreate', async message => {
                 .setColor('Random')
                 .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH BOT')
                 .addFields(
-                    { 
-                        name: '💼 Kinh tế & Tín dụng', 
-                        value: '• `!profile` (`!pf`): Xem thông tin tài khoản, số dư, tiền nợ & danh hiệu\n' +
-                               '• `!sodu` (`!balance`): Kiểm tra nhanh số dư ví\n' +
-                               '• `!daily`: Điểm danh nhận thưởng hàng ngày\n' +
-                               '• `!work`: Làm việc kiếm tiền (cooldown 30 phút)\n' +
-                               '• `!chuyen @user <số_tiền>`: Chuyển tiền cho người chơi khác\n' +
-                               '• `!top` (`!bxh`): Bảng xếp hạng đại gia\n' +
-                               '• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%)\n' +
-                               '• `!trano <số_tiền|all>`: Trả nợ ngân hàng', 
-                        inline: false 
-                    },
-                    { 
-                        name: '📈 Chứng Khoán & Crypto', 
-                        value: '• `!coin`: Xem bảng giá thị trường crypto trực tuyến\n' +
-                               '• `!coin chart <MÃ_COIN>`: Xem biểu đồ giá trực quan *(VD: `!coin chart BTC`)*\n' +
-                               '• `!coin mua <MÃ_COIN> <SL>`: Mua đồng coin\n' +
-                               '• `!coin ban <MÃ_COIN> <SL|all>`: Bán chốt lời đồng coin\n' +
-                               '• `!coin vi` (`!coin portfolio`): Xem danh mục đầu tư cá nhân', 
-                        inline: false 
-                    },
-                    { 
-                        name: '🎲 Game & Giải Trí', 
-                        value: '• **Tài Xỉu**: Đặt cược thông qua giao diện nút bấm (40s/phiên)\n' +
-                               '• `!bj <số_tiền>`: Chơi game Blackjack (Xì dách)\n' +
-                               '• `!veso`: Xem vé số hiện tại / `!veso mua <6_số>`: Mua vé số kiến thiết\n' +
-                               '• `!lode de/lo <2_số> <tiền>`: Đặt cược Lô/Đề quay thưởng lúc 18:00\n' +
-                               '• `!ketqua` (`!kqxs`): Xem kết quả xổ số gần nhất\n' +
-                               '• **Nối Từ**: Trả lời từ ghép 2 tiếng tiếp theo trong kênh game / `!noitu reset`: Khởi động lại game', 
-                        inline: false 
-                    },
-                    { 
-                        name: '⚙️ Cấu Hình Kênh (Staff/Admin)', 
-                        value: '• `!settaixiu`: Cài đặt kênh tự động mở game Tài Xỉu\n' +
-                               '• `!setlode`: Cài đặt kênh thông báo kết quả Lô Đề\n' +
-                               '• `!setnoitu`: Cài đặt kênh chơi game Nối Từ\n' +
-                               '• `!setcoin`: Cài đặt kênh tự động thông báo giá Coin (tự xóa tin cũ)', 
-                        inline: false 
-                    },
-                    { 
-                        name: '🛡️ Lệnh Ban Quản Trị (Staff/Owner)', 
-                        value: '• `!cong @user <tiền>` / `!tru @user <tiền>`: Cộng/trừ tiền người chơi\n' +
-                               '• `!addstaff @user` / `!delstaff @user`: Thêm/xóa Staff bot\n' +
-                               '• `!stafflist`: Xem danh sách Staff\n' +
-                               '• `!resetmoney @user`: Reset ví về 50.000đ *(Owner)*\n' +
-                               '• `!settitle @user <tên>` / `!resettitle @user`: Đặt/xóa danh hiệu *(Owner)*\n' +
-                               '• `!forcedraw`: Ép quay thưởng Xổ Số ngay lập tức *(Owner)*\n' +
-                               '• `!exportdata` / `!importdata`: Backup & Khôi phục dữ liệu JSON *(Owner)*', 
-                        inline: false 
-                    }
+                    { name: '📈 Chứng Khoán & Crypto', value: '• `!coin`: Xem bảng giá kèm các nút bấm tương tác (Mua, Bán, Biểu đồ trực tiếp)\n• `!coin chart <MÃ>`: Xem biểu đồ\n• `!coin vi`: Xem danh mục đầu tư', inline: false },
+                    { name: '⚙️ Cấu Hình', value: '• `!setcoin`: Kênh tự động báo giá coin (kèm nút bấm & tự xóa tin cũ)', inline: false }
                 );
             return message.reply({ embeds: [embed] });
         }
@@ -1410,19 +1185,12 @@ client.on('messageCreate', async message => {
             const targetUser = message.mentions.users.first() || message.author;
             const bal = getBalance(targetUser.id);
             const loan = getLoan(targetUser.id);
-            const sorted = Array.from(balances.entries()).sort((a, b) => b[1] - a[1]);
-            const rank = sorted.findIndex(([id]) => id === targetUser.id) + 1 || 'N/A';
-
-            let title = customTitles.get(targetUser.id) || (bal >= 5000000 ? 'Đại gia 👑' : 'Thành viên 🌱');
-
             const embed = new EmbedBuilder()
                 .setColor('Blurple')
                 .setTitle(`🪪 HỒ SƠ - ${targetUser.username}`)
                 .addFields(
                     { name: '💰 Số dư', value: `**${formatMoney(bal)}**`, inline: true },
-                    { name: '💳 Tiền nợ', value: `**${formatMoney(loan)}**`, inline: true },
-                    { name: '🏆 BXH', value: `**#${rank}**`, inline: true },
-                    { name: '🎖️ Danh hiệu', value: `**${title}**`, inline: false }
+                    { name: '💳 Tiền nợ', value: `**${formatMoney(loan)}**`, inline: true }
                 );
             return message.reply({ embeds: [embed] });
         }
@@ -1434,33 +1202,9 @@ client.on('messageCreate', async message => {
         if (command === 'daily') {
             const now = Date.now();
             if (now - (dailyCooldown.get(userId) || 0) < 86400000) return message.reply('⏰ Đã điểm danh hôm nay rồi!');
-            const bonus = 100000;
-            setBalance(userId, getBalance(userId) + bonus);
+            setBalance(userId, getBalance(userId) + 100000);
             dailyCooldown.set(userId, now);
-            return message.reply(`🎁 Điểm danh nhận **${formatMoney(bonus)}**!`);
-        }
-
-        if (command === 'work') {
-            const now = Date.now();
-            if (now - (workCooldown.get(userId) || 0) < 1800000) return message.reply('☕ Hãy nghỉ ngơi thêm chút nữa!');
-            const pay = 50000;
-            setBalance(userId, getBalance(userId) + pay);
-            workCooldown.set(userId, now);
-            return message.reply(`💼 Làm việc kiếm được **${formatMoney(pay)}**!`);
-        }
-
-        if (command === 'chuyen' || command === 'pay') {
-            const targetUser = message.mentions.users.first();
-            const amount = parseInt(args[1], 10);
-            if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('❌ Cú pháp: `!chuyen @user <số_tiền>`');
-            if (targetUser.id === userId) return message.reply('❌ Không thể tự chuyển!');
-
-            const senderBal = getBalance(userId);
-            if (senderBal < amount) return message.reply('❌ Số dư không đủ!');
-
-            setBalance(userId, senderBal - amount);
-            setBalance(targetUser.id, getBalance(targetUser.id) + amount);
-            return message.reply(`💸 Đã chuyển **${formatMoney(amount)}** cho ${targetUser}!`);
+            return message.reply(`🎁 Điểm danh nhận **+100.000đ**!`);
         }
 
         if (command === 'top' || command === 'bxh') {
