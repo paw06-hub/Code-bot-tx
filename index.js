@@ -1214,7 +1214,7 @@ client.on('messageCreate', async message => {
             let titleText = customTitles.get(targetUser.id);
             if (!titleText) {
                 if (isBotOwner(targetUser.id)) {
-                    titleText = '👑 Chủ Tịch / Admin Tối Cao';
+                    titleText = '👑 Admin Tối Cao';
                 } else if (isBotStaff(targetUser.id)) {
                     titleText = '🛡️ Quản Trị Viên';
                 } else {
