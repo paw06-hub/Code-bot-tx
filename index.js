@@ -45,6 +45,7 @@ const FILES = {
     LODE_CONFIG: './lode_config.json', 
     LOTTERY: './lottery.json',         
     STAFFS: './staffs.json',           
+    ADMINS: './admins.json',           // Thêm file quản lý Admin phụ
     LOANS: './loans.json',             
     CRYPTO: './crypto.json',           
     PORTFOLIO: './portfolio.json'      
@@ -78,6 +79,7 @@ let wordConfig = loadJSON(FILES.WORD_CONFIG, false);
 let lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
 let lotteryData = loadJSON(FILES.LOTTERY, false);
 let staffList = loadJSON(FILES.STAFFS, false);
+let adminList = loadJSON(FILES.ADMINS, false); // Tải danh sách Admin phụ
 let loans = loadJSON(FILES.LOANS);
 let cryptoMarket = loadJSON(FILES.CRYPTO, false);
 let portfolios = loadJSON(FILES.PORTFOLIO);
@@ -86,6 +88,7 @@ if (!lotteryData.tickets) lotteryData.tickets = [];
 if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
 if (!lotteryData.lastResult) lotteryData.lastResult = null;
 if (!Array.isArray(staffList.users)) staffList.users = [];
+if (!Array.isArray(adminList.users)) adminList.users = []; // Khởi tạo mảng Admin phụ nếu chưa có
 
 if (!cryptoMarket.coins) {
     cryptoMarket.coins = {
@@ -103,7 +106,8 @@ const bjGames = new Map();
 const wordGameSessions = new Map();
 const dictionaryCache = new Map();
 
-const isBotOwner = (userId) => userId === ADMIN_ID;
+// Cập nhật hàm kiểm tra Owner/Admin: Bao gồm Admin chính và các Admin phụ được thêm vào danh sách
+const isBotOwner = (userId) => userId === ADMIN_ID || adminList.users.includes(userId);
 const isBotStaff = (userId) => isBotOwner(userId) || staffList.users.includes(userId);
 
 async function checkVietnameseWordOnline(word) {
@@ -998,6 +1002,7 @@ client.on('messageCreate', async message => {
             lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
             lotteryData = loadJSON(FILES.LOTTERY, false);
             staffList = loadJSON(FILES.STAFFS, false);
+            adminList = loadJSON(FILES.ADMINS, false);
             loans = loadJSON(FILES.LOANS);
             cryptoMarket = loadJSON(FILES.CRYPTO, false);
             portfolios = loadJSON(FILES.PORTFOLIO);
@@ -1008,6 +1013,101 @@ client.on('messageCreate', async message => {
             }
 
             return message.reply(replyMessage);
+        }
+
+        // --- LỆNH QUẢN LÝ ADMIN PHỤ ---
+        if (command === 'addadmin') {
+            if (userId !== ADMIN_ID) return message.reply('❌ Chỉ Owner gốc mới có quyền thêm Admin phụ!');
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Cú pháp: `!addadmin @user`');
+
+            if (targetUser.id === ADMIN_ID) {
+                return message.reply('⚠️ Đây là Owner gốc rồi!');
+            }
+
+            if (adminList.users.includes(targetUser.id)) {
+                return message.reply(`⚠️ ${targetUser} đã có quyền Admin phụ từ trước!`);
+            }
+
+            adminList.users.push(targetUser.id);
+            saveJSONSync(FILES.ADMINS, adminList);
+            return message.reply(`✅ Đã thêm ${targetUser} vào danh sách Admin phụ thành công!`);
+        }
+
+        if (command === 'removeadmin' || command === 'deladmin') {
+            if (userId !== ADMIN_ID) return message.reply('❌ Chỉ Owner gốc mới có quyền gỡ Admin phụ!');
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Cú pháp: `!removeadmin @user`');
+
+            const index = adminList.users.indexOf(targetUser.id);
+            if (index === -1) {
+                return message.reply(`⚠️ ${targetUser} không có trong danh sách Admin phụ!`);
+            }
+
+            adminList.users.splice(index, 1);
+            saveJSONSync(FILES.ADMINS, adminList);
+            return message.reply(`✅ Đã gỡ bỏ quyền Admin phụ của ${targetUser}.`);
+        }
+
+        if (command === 'listadmin' || command === 'admins') {
+            if (!isBotOwner(userId)) return message.reply('❌ Bạn không có quyền xem danh sách này!');
+            
+            let desc = `👑 **Owner Gốc:** <@${ADMIN_ID}>\n`;
+            if (adminList.users.length > 0) {
+                desc += `🛡️ **Admin Phụ:**\n` + adminList.users.map(id => `• <@${id}>`).join('\n');
+            } else {
+                desc += `🛡️ **Admin Phụ:** Chưa có ai.`;
+            }
+
+            const embed = new EmbedBuilder()
+                .setColor('Gold')
+                .setTitle('👑 DANH SÁCH QUẢN TRỊ VIÊN CẤP CAO (ADMIN)')
+                .setDescription(desc);
+            return message.reply({ embeds: [embed] });
+        }
+
+        // --- LỆNH QUẢN LÝ STAFF ---
+        if (command === 'addstaff') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền thêm Staff!');
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Cú pháp: `!addstaff @user`');
+
+            if (staffList.users.includes(targetUser.id)) {
+                return message.reply(`⚠️ ${targetUser} đã có trong danh sách Staff từ trước!`);
+            }
+
+            staffList.users.push(targetUser.id);
+            saveJSONSync(FILES.STAFFS, staffList);
+            return message.reply(`✅ Đã thêm ${targetUser} vào danh sách Quản Trị Viên (Staff)!`);
+        }
+
+        if (command === 'removestaff' || command === 'delstaff') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền xóa Staff!');
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Cú pháp: `!removestaff @user`');
+
+            const index = staffList.users.indexOf(targetUser.id);
+            if (index === -1) {
+                return message.reply(`⚠️ ${targetUser} không có trong danh sách Staff!`);
+            }
+
+            staffList.users.splice(index, 1);
+            saveJSONSync(FILES.STAFFS, staffList);
+            return message.reply(`✅ Đã gỡ bỏ ${targetUser} khỏi danh sách Staff.`);
+        }
+
+        if (command === 'liststaff' || command === 'staffs') {
+            if (!isBotStaff(userId)) return message.reply('❌ Bạn không có quyền xem danh sách này!');
+            if (staffList.users.length === 0) {
+                return message.reply('🛡️ Danh sách Staff hiện tại đang trống.');
+            }
+
+            const staffMentions = staffList.users.map(id => `• <@${id}>`).join('\n');
+            const embed = new EmbedBuilder()
+                .setColor('Blue')
+                .setTitle('🛡️ DANH SÁCH QUẢN TRỊ VIÊN (STAFF)')
+                .setDescription(staffMentions);
+            return message.reply({ embeds: [embed] });
         }
 
         if (['coin', 'crypto', 'chungkhoan'].includes(command)) {
@@ -1246,7 +1346,7 @@ client.on('messageCreate', async message => {
                     },
                     { 
                         name: '⚙️ Lệnh Quản Trị & Cấu Hình (Admin / Staff)', 
-                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
+                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!addadmin @user`: Thêm Admin phụ tối cao (Chỉ Owner gốc)\n• `!removeadmin @user`: Gỡ Admin phụ (Chỉ Owner gốc)\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff\n• `!removestaff @user`: Xóa quản trị viên Staff\n• `!liststaff`: Xem danh sách Staff\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
                         inline: false 
                     }
                 )
@@ -1265,8 +1365,8 @@ client.on('messageCreate', async message => {
 
             let titleText = customTitles.get(targetUser.id);
             if (!titleText) {
-                if (isBotOwner(targetUser.id)) {
-                    titleText = '👑 Admin Tối Cao';
+                if (targetUser.id === ADMIN_ID || adminList.users.includes(targetUser.id)) {
+                    titleText = '👑 Quản Trị Tối Cao';
                 } else if (isBotStaff(targetUser.id)) {
                     titleText = '🛡️ Quản Trị Viên';
                 } else {
