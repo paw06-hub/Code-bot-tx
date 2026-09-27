@@ -202,7 +202,8 @@ function updateCryptoPrices() {
 }
 
 function scheduleCryptoMarket() {
-    setInterval(updateCryptoPrices, 600000);
+    // Đã cập nhật thời gian làm mới giá từ 10 phút (600000ms) xuống 2 phút (120000ms)
+    setInterval(updateCryptoPrices, 120000);
 }
 
 const getWordSession = (guildId) => {
@@ -778,11 +779,11 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // 📈 HỆ THỐNG TÀI CHÍNH: CRYPTO & CHỨNG KHOÁN GIẢ LẬP (TÍCH HỢP BIỂU ĐỒ TRỰC QUYẾN)
+        // 📈 HỆ THỐNG TÀI CHÍNH: CRYPTO & CHỨNG KHOÁN GIẢ LẬP
         if (['coin', 'crypto', 'chungkhoan'].includes(command)) {
             const subCmd = args[0]?.toLowerCase();
 
-            // XEM BIỂU ĐỒ GIÁ: !coin chart <MÃ_COIN> hoặc !coin bieudo <MÃ_COIN>
+            // XEM BIỂU ĐỒ GIÁ: !coin chart <MÃ_COIN>
             if (subCmd === 'chart' || subCmd === 'bieudo') {
                 const symbol = args[1]?.toUpperCase();
                 if (!symbol || !cryptoMarket.coins[symbol]) {
@@ -921,7 +922,7 @@ client.on('messageCreate', async message => {
             const embedMarket = new EmbedBuilder()
                 .setColor('Blurple')
                 .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO')
-                .setDescription(`*Thị trường tự động cập nhật giá sau mỗi 10 phút.*\n\n${marketText}`)
+                .setDescription(`*Thị trường tự động cập nhật giá sau mỗi 2 phút.*\n\n${marketText}`)
                 .addFields(
                     { name: '📈 Xem biểu đồ', value: '`!coin chart <MÃ_COIN>`', inline: true },
                     { name: '🛒 Mua coin', value: '`!coin mua <MÃ_COIN> <SL>`', inline: true },
@@ -1290,9 +1291,55 @@ client.on('messageCreate', async message => {
                 .setColor('Random')
                 .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH BOT')
                 .addFields(
-                    { name: '💼 Kinh tế & Tín dụng', value: '`!profile`, `!daily`, `!work`, `!chuyen`\n• Vay: `!vay <tiền>` (Lãi 30%)\n• Trả nợ: `!trano <tiền|all>`', inline: false },
-                    { name: '📈 Chứng Khoán & Biểu Đồ', value: '• Xem giá: `!coin`\n• **Xem biểu đồ:** `!coin chart <MÃ_COIN>` *(VD: `!coin chart BTC`)*\n• Mua/Bán: `!coin mua/ban <MÃ> <SL>`', inline: false },
-                    { name: '🎲 Mini-Game', value: '• Tài Xỉu (Nút bấm)\n• Blackjack: `!bj <tiền>`\n• Vé Số & Lô Đề (18:00)', inline: false }
+                    { 
+                        name: '💼 Kinh tế & Tín dụng', 
+                        value: '• `!profile` (`!pf`): Xem thông tin tài khoản, số dư, tiền nợ & danh hiệu\n' +
+                               '• `!sodu` (`!balance`): Kiểm tra nhanh số dư ví\n' +
+                               '• `!daily`: Điểm danh nhận thưởng hàng ngày\n' +
+                               '• `!work`: Làm việc kiếm tiền (cooldown 30 phút)\n' +
+                               '• `!chuyen @user <số_tiền>`: Chuyển tiền cho người chơi khác\n' +
+                               '• `!top` (`!bxh`): Bảng xếp hạng đại gia\n' +
+                               '• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%)\n' +
+                               '• `!trano <số_tiền|all>`: Trả nợ ngân hàng', 
+                        inline: false 
+                    },
+                    { 
+                        name: '📈 Chứng Khoán & Crypto', 
+                        value: '• `!coin`: Xem bảng giá thị trường crypto trực tuyến\n' +
+                               '• `!coin chart <MÃ_COIN>`: Xem biểu đồ giá trực quan *(VD: `!coin chart BTC`)*\n' +
+                               '• `!coin mua <MÃ_COIN> <SL>`: Mua đồng coin\n' +
+                               '• `!coin ban <MÃ_COIN> <SL|all>`: Bán chốt lời đồng coin\n' +
+                               '• `!coin vi` (`!coin portfolio`): Xem danh mục đầu tư cá nhân', 
+                        inline: false 
+                    },
+                    { 
+                        name: '🎲 Game & Giải Trí', 
+                        value: '• **Tài Xỉu**: Đặt cược thông qua giao diện nút bấm (40s/phiên)\n' +
+                               '• `!bj <số_tiền>`: Chơi game Blackjack (Xì dách)\n' +
+                               '• `!veso`: Xem vé số hiện tại / `!veso mua <6_số>`: Mua vé số kiến thiết\n' +
+                               '• `!lode de/lo <2_số> <tiền>`: Đặt cược Lô/Đề quay thưởng lúc 18:00\n' +
+                               '• `!ketqua` (`!kqxs`): Xem kết quả xổ số gần nhất\n' +
+                               '• **Nối Từ**: Trả lời từ ghép 2 tiếng tiếp theo trong kênh game / `!noitu reset`: Khởi động lại game', 
+                        inline: false 
+                    },
+                    { 
+                        name: '⚙️ Cấu Hình Kênh (Staff/Admin)', 
+                        value: '• `!settaixiu`: Cài đặt kênh tự động mở game Tài Xỉu\n' +
+                               '• `!setlode`: Cài đặt kênh thông báo kết quả Lô Đề\n' +
+                               '• `!setnoitu`: Cài đặt kênh chơi game Nối Từ', 
+                        inline: false 
+                    },
+                    { 
+                        name: '🛡️ Lệnh Ban Quản Trị (Staff/Owner)', 
+                        value: '• `!cong @user <tiền>` / `!tru @user <tiền>`: Cộng/trừ tiền người chơi\n' +
+                               '• `!addstaff @user` / `!delstaff @user`: Thêm/xóa Staff bot\n' +
+                               '• `!stafflist`: Xem danh sách Staff\n' +
+                               '• `!resetmoney @user`: Reset ví về 50.000đ *(Owner)*\n' +
+                               '• `!settitle @user <tên>` / `!resettitle @user`: Đặt/xóa danh hiệu *(Owner)*\n' +
+                               '• `!forcedraw`: Ép quay thưởng Xổ Số ngay lập tức *(Owner)*\n' +
+                               '• `!exportdata` / `!importdata`: Backup & Khôi phục dữ liệu JSON *(Owner)*', 
+                        inline: false 
+                    }
                 );
             return message.reply({ embeds: [embed] });
         }
