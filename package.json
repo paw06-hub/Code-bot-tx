@@ -1,13 +1,19 @@
 {
-  "name": "discord-bot-casino",
+  "name": "code-bot-tx",
   "version": "1.0.0",
-  "description": "Discord Bot Casino & Nối Từ",
+  "description": "Discord/Telegram Bot Project",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
-    "express": "^4.18.2"
+    "axios": "^1.7.7",
+    "discord.js": "^14.16.3",
+    "telegraf": "^4.16.3",
+    "express": "^4.21.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
