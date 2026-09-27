@@ -5,7 +5,7 @@ const {
 } = require('discord.js');
 const fs = require('fs');
 const express = require('express');
-const axios = require('axios'); // Dùng để đọc/tải file đính kèm khi import
+const axios = require('axios');
 
 // ==========================================
 // 1. WEB SERVER GIỮ BOT SỐNG TRÊN RENDER
@@ -40,12 +40,14 @@ const ADMIN_ID = process.env.ADMIN_ID || '1498554147304247296';
 const FILES = {
     BALANCES: './balances.json',
     TITLES: './titles.json',
-    CONFIG: './config.json',           // Cấu hình & Lịch sử Tài Xỉu
-    WORD_CONFIG: './word_config.json', // Kênh Nối Từ
-    LODE_CONFIG: './lode_config.json', // Kênh Lô Đề 18h
-    LOTTERY: './lottery.json',         // Vé số, Cược Lô Đề & KQXS
-    STAFFS: './staffs.json',           // File lưu danh sách Staff
-    LOANS: './loans.json'              // File lưu khoản vay & nợ
+    CONFIG: './config.json',           
+    WORD_CONFIG: './word_config.json', 
+    LODE_CONFIG: './lode_config.json', 
+    LOTTERY: './lottery.json',         
+    STAFFS: './staffs.json',           
+    LOANS: './loans.json',             
+    CRYPTO: './crypto.json',           
+    PORTFOLIO: './portfolio.json'      
 };
 
 // DATA MANAGERS & AUTO-SAVE IMMEDIATELY
@@ -69,7 +71,6 @@ const saveJSONSync = (file, data) => {
     }
 };
 
-// NẠP DỮ LIỆU TỪ FILE JSON KHI KHỞI ĐỘNG
 let balances = loadJSON(FILES.BALANCES);
 let customTitles = loadJSON(FILES.TITLES);
 let config = loadJSON(FILES.CONFIG, false);
@@ -77,12 +78,23 @@ let wordConfig = loadJSON(FILES.WORD_CONFIG, false);
 let lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
 let lotteryData = loadJSON(FILES.LOTTERY, false);
 let staffList = loadJSON(FILES.STAFFS, false);
-let loans = loadJSON(FILES.LOANS); // Map lưu nợ vay
+let loans = loadJSON(FILES.LOANS);
+let cryptoMarket = loadJSON(FILES.CRYPTO, false);
+let portfolios = loadJSON(FILES.PORTFOLIO);
 
 if (!lotteryData.tickets) lotteryData.tickets = [];
 if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
 if (!lotteryData.lastResult) lotteryData.lastResult = null;
 if (!Array.isArray(staffList.users)) staffList.users = [];
+
+if (!cryptoMarket.coins) {
+    cryptoMarket.coins = {
+        'BTC': { name: 'Bitcoin', price: 100000, history: [100000], change: 0 },
+        'ETH': { name: 'Ethereum', price: 50000, history: [50000], change: 0 },
+        'JNG': { name: 'JangJii Coin', price: 10000, history: [10000], change: 0 }
+    };
+    saveJSONSync(FILES.CRYPTO, cryptoMarket);
+}
 
 const dailyCooldown = new Map();
 const workCooldown = new Map();
@@ -90,27 +102,21 @@ const crimeCooldown = new Map();
 const guildSessions = new Map();
 const bjGames = new Map();
 const wordGameSessions = new Map();
-
 const dictionaryCache = new Map();
 
-// HELPER CHECK QUYỀN
 const isBotOwner = (userId) => userId === ADMIN_ID;
 const isBotStaff = (userId) => isBotOwner(userId) || staffList.users.includes(userId);
 
 async function checkVietnameseWordOnline(word) {
     if (dictionaryCache.has(word)) return dictionaryCache.get(word);
-
     try {
         const url = `https://vi.wiktionary.org/w/api.php?action=query&titles=${encodeURIComponent(word)}&format=json`;
         const response = await fetch(url);
         const data = await response.json();
-        
         const pages = data.query?.pages;
         if (!pages) return false;
-
         const pageId = Object.keys(pages)[0];
         const isValid = pageId !== "-1";
-
         dictionaryCache.set(word, isValid);
         return isValid;
     } catch (error) {
@@ -121,7 +127,6 @@ async function checkVietnameseWordOnline(word) {
 
 const START_WORDS = ['phát triển', 'học tập', 'máy tính', 'yêu thương', 'thành công', 'gia đình', 'hy vọng', 'tương lai', 'thành phố', 'văn hóa'];
 
-// HELPER FUNCTIONS FOR MONEY WITH AUTO-SAVE
 const formatMoney = (amount) => Number(amount).toLocaleString('vi-VN') + 'đ';
 
 const getBalance = (userId) => {
@@ -134,27 +139,72 @@ const getBalance = (userId) => {
 
 const setBalance = (userId, amount) => {
     balances.set(userId, Math.max(0, amount));
-    saveJSONSync(FILES.BALANCES, balances); // Ghi đĩa ngay lập tức
+    saveJSONSync(FILES.BALANCES, balances);
 };
 
-// HELPER MANAGEMENT FOR LOANS
-const LOAN_INTEREST_RATE = 0.30; // Lãi suất 30%
-const MAX_LOAN_LIMIT = 5000000;   // Hạn ngạch vay tối đa: 5.000.000đ
+const LOAN_INTEREST_RATE = 0.30;
+const MAX_LOAN_LIMIT = 5000000;
 
-const getLoan = (userId) => {
-    return loans.get(userId) || 0;
-};
-
+const getLoan = (userId) => loans.get(userId) || 0;
 const setLoan = (userId, amount) => {
-    if (amount <= 0) {
-        loans.delete(userId);
-    } else {
-        loans.set(userId, amount);
-    }
+    if (amount <= 0) loans.delete(userId);
+    else loans.set(userId, amount);
     saveJSONSync(FILES.LOANS, loans);
 };
 
-// GAME NỐI TỪ SESSION
+const getUserPortfolio = (userId) => portfolios.get(userId) || {};
+const setUserPortfolio = (userId, portfolioData) => {
+    portfolios.set(userId, portfolioData);
+    saveJSONSync(FILES.PORTFOLIO, portfolios);
+};
+
+// HÀM TẠO URL BIỂU ĐỒ KỸ THUẬT SỐ (QUICKCHART API)
+const getCryptoChartUrl = (symbol, coin) => {
+    const chartConfig = {
+        type: 'line',
+        data: {
+            labels: coin.history.map((_, index) => `P${index + 1}`),
+            datasets: [{
+                label: `Biểu đồ giá ${symbol}`,
+                data: coin.history,
+                borderColor: 'rgb(0, 255, 128)',
+                backgroundColor: 'rgba(0, 255, 128, 0.2)',
+                fill: true,
+                tension: 0.2
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { labels: { color: 'white' } }
+            },
+            scales: {
+                x: { ticks: { color: 'white' }, grid: { color: '#333' } },
+                y: { ticks: { color: 'white' }, grid: { color: '#333' } }
+            }
+        }
+    };
+    return `https://quickchart.io/chart?w=500&h=250&bkg=#2f3136&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
+};
+
+function updateCryptoPrices() {
+    for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
+        const percentChange = (Math.random() * 0.30) - 0.15;
+        let newPrice = Math.round(coin.price * (1 + percentChange));
+        if (newPrice < 1000) newPrice = 1000;
+
+        coin.change = Math.round(percentChange * 100);
+        coin.price = newPrice;
+        coin.history.push(newPrice);
+        if (coin.history.length > 10) coin.history.shift();
+    }
+    saveJSONSync(FILES.CRYPTO, cryptoMarket);
+    console.log('📈 [Crypto Engine] Đã cập nhật giá thị trường coin!');
+}
+
+function scheduleCryptoMarket() {
+    setInterval(updateCryptoPrices, 600000);
+}
+
 const getWordSession = (guildId) => {
     if (!wordGameSessions.has(guildId)) {
         const randomWord = START_WORDS[Math.floor(Math.random() * START_WORDS.length)];
@@ -193,7 +243,6 @@ const startWordGameTimeout = (guildId, channel) => {
     }, 180000);
 };
 
-// TÀI XỈU SESSION MANAGER
 const getSession = (guildId) => {
     if (!guildSessions.has(guildId)) {
         const guildCfg = config[guildId] || {};
@@ -246,9 +295,6 @@ const renderHistoryBridge = (history) => {
     }).join(' ➔ ');
 };
 
-// ==========================================
-// 3. XỔ SỐ & LÔ ĐỀ SYSTEM (18:00)
-// ==========================================
 function generateLotteryResults() {
     const pad = (num, size) => num.toString().padStart(size, '0');
     const specialPrize = pad(Math.floor(Math.random() * 1000000), 6);
@@ -263,10 +309,8 @@ function generateLotteryResults() {
 }
 
 async function processLotteryDraw() {
-    console.log('⏰ Bắt đầu quay thưởng Xổ Số & Lô Đề lúc 18:00...');
     const result = generateLotteryResults();
     lotteryData.lastResult = result;
-
     const specialDe = result.specialPrize.slice(-2);
 
     const ticketWinners = [];
@@ -332,7 +376,6 @@ function scheduleDailyLottery() {
     setInterval(checkTime, 60000);
 }
 
-// BLACKJACK ENGINE
 const SUITS = ['♠️', '♥️', '♦️', '♣️'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
@@ -374,7 +417,6 @@ const formatHand = (hand, hideSecond = false) => {
     return hand.map(c => `${c.value}${c.suit}`).join(' ');
 };
 
-// TÀI XỈU ENGINE
 async function updateOpenEmbed(txSession) {
     if (!txSession.lastOpenMessage) return;
     const { totalTai, countTai, totalXiu, countXiu } = getSessionStats(txSession);
@@ -485,7 +527,6 @@ async function startTaiXiuLoop(guildId, channelId) {
     runSession();
 }
 
-// EVENTS
 client.once('ready', () => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
     for (const [guildId, guildData] of Object.entries(config)) {
@@ -493,6 +534,7 @@ client.once('ready', () => {
         if (channelId) startTaiXiuLoop(guildId, channelId);
     }
     scheduleDailyLottery();
+    scheduleCryptoMarket();
 });
 
 client.on('interactionCreate', async interaction => {
@@ -659,7 +701,6 @@ client.on('messageCreate', async message => {
     const guildId = message.guild.id;
     const userId = message.author.id;
 
-    // KÊNH GAME NỐI TỪ
     if (wordConfig[guildId] && message.channel.id === wordConfig[guildId]) {
         if (message.content.startsWith(PREFIX)) {
             const args = message.content.slice(PREFIX.length).trim().split(/ +/);
@@ -737,7 +778,161 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // 🏦 HỆ THỐNG VAY TIỀN & TRẢ NỢ (TÍN DỤNG) - LÃI SUẤT 30%
+        // 📈 HỆ THỐNG TÀI CHÍNH: CRYPTO & CHỨNG KHOÁN GIẢ LẬP (TÍCH HỢP BIỂU ĐỒ TRỰC QUYẾN)
+        if (['coin', 'crypto', 'chungkhoan'].includes(command)) {
+            const subCmd = args[0]?.toLowerCase();
+
+            // XEM BIỂU ĐỒ GIÁ: !coin chart <MÃ_COIN> hoặc !coin bieudo <MÃ_COIN>
+            if (subCmd === 'chart' || subCmd === 'bieudo') {
+                const symbol = args[1]?.toUpperCase();
+                if (!symbol || !cryptoMarket.coins[symbol]) {
+                    return message.reply('❌ Cú pháp xem biểu đồ: `!coin chart <MÃ_COIN>`\n*(VD: `!coin chart BTC`)*');
+                }
+
+                const coin = cryptoMarket.coins[symbol];
+                const chartUrl = getCryptoChartUrl(symbol, coin);
+
+                const embed = new EmbedBuilder()
+                    .setColor('Blurple')
+                    .setTitle(`📈 BIỂU ĐỒ GIÁ TRỰC QUYẾN - ${coin.name} (${symbol})`)
+                    .setDescription(`Giá hiện tại: **${formatMoney(coin.price)}** | Biến động: **${coin.change > 0 ? '+' : ''}${coin.change}%**`)
+                    .setImage(chartUrl)
+                    .setFooter({ text: 'Biểu đồ trực quan tự động cập nhật theo lịch sử giá.' });
+
+                return message.reply({ embeds: [embed] });
+            }
+
+            // MUA COIN: !coin mua <MÃ_COIN> <SỐ_LƯỢNG>
+            if (subCmd === 'mua' || subCmd === 'buy') {
+                const symbol = args[1]?.toUpperCase();
+                const amount = parseInt(args[2], 10);
+
+                if (!symbol || !cryptoMarket.coins[symbol] || isNaN(amount) || amount <= 0) {
+                    return message.reply('❌ Cú pháp: `!coin mua <MÃ_COIN> <số_lượng>`\n*(VD: `!coin mua BTC 2`)*');
+                }
+
+                const coin = cryptoMarket.coins[symbol];
+                const totalPrice = coin.price * amount;
+                const userBal = getBalance(userId);
+
+                if (userBal < totalPrice) {
+                    return message.reply(`❌ Bạn không đủ tiền mặt! Cần **${formatMoney(totalPrice)}** nhưng ví chỉ có **${formatMoney(userBal)}**.`);
+                }
+
+                setBalance(userId, userBal - totalPrice);
+
+                const portfolio = getUserPortfolio(userId);
+                portfolio[symbol] = (portfolio[symbol] || 0) + amount;
+                setUserPortfolio(userId, portfolio);
+
+                const embed = new EmbedBuilder()
+                    .setColor('Green')
+                    .setTitle(`📈 MUA THÀNH CÔNG - ${coin.name} (${symbol})`)
+                    .addFields(
+                        { name: '📦 Số lượng mua', value: `**${amount}**${symbol}`, inline: true },
+                        { name: '💵 Tổng thanh toán', value: `**${formatMoney(totalPrice)}**`, inline: true },
+                        { name: '💰 Số dư ví còn lại', value: `**${formatMoney(getBalance(userId))}**`, inline: false }
+                    );
+
+                return message.reply({ embeds: [embed] });
+            }
+
+            // BÁN COIN: !coin ban <MÃ_COIN> <SỐ_LƯỢNG>
+            if (subCmd === 'ban' || subCmd === 'sell') {
+                const symbol = args[1]?.toUpperCase();
+                let amount = parseInt(args[2], 10);
+
+                const portfolio = getUserPortfolio(userId);
+                const userOwned = portfolio[symbol] || 0;
+
+                if (args[2]?.toLowerCase() === 'all') {
+                    amount = userOwned;
+                }
+
+                if (!symbol || !cryptoMarket.coins[symbol] || isNaN(amount) || amount <= 0) {
+                    return message.reply('❌ Cú pháp: `!coin ban <MÃ_COIN> <số_lượng|all>`\n*(VD: `!coin ban BTC all`)*');
+                }
+
+                if (userOwned < amount) {
+                    return message.reply(`❌ Bạn không có đủ coin để bán! Trong ví hiện có **${userOwned}${symbol}**.`);
+                }
+
+                const coin = cryptoMarket.coins[symbol];
+                const totalReceive = coin.price * amount;
+
+                portfolio[symbol] -= amount;
+                if (portfolio[symbol] <= 0) delete portfolio[symbol];
+                setUserPortfolio(userId, portfolio);
+
+                setBalance(userId, getBalance(userId) + totalReceive);
+
+                const embed = new EmbedBuilder()
+                    .setColor('Gold')
+                    .setTitle(`📉 BÁN THÀNH CÔNG - ${coin.name} (${symbol})`)
+                    .addFields(
+                        { name: '📦 Số lượng bán', value: `**${amount}**${symbol}`, inline: true },
+                        { name: '💵 Tổng tiền nhận về', value: `**+${formatMoney(totalReceive)}**`, inline: true },
+                        { name: '💰 Số dư ví hiện tại', value: `**${formatMoney(getBalance(userId))}**`, inline: false }
+                    );
+
+                return message.reply({ embeds: [embed] });
+            }
+
+            // XEM VÍ CRYPTO: !coin vi / !coin portfolio
+            if (subCmd === 'vi' || subCmd === 'portfolio') {
+                const portfolio = getUserPortfolio(userId);
+                const ownedKeys = Object.keys(portfolio);
+
+                if (ownedKeys.length === 0) {
+                    return message.reply('💼 Danh mục đầu tư của bạn đang trống. Dùng `!coin` để xem giá thị trường!');
+                }
+
+                let desc = '';
+                let totalValue = 0;
+
+                for (const symbol of ownedKeys) {
+                    const count = portfolio[symbol];
+                    const coin = cryptoMarket.coins[symbol];
+                    if (coin) {
+                        const val = count * coin.price;
+                        totalValue += val;
+                        desc += `• **${coin.name} (${symbol})**:${count} coin | Giá trị: **${formatMoney(val)}**\n`;
+                    }
+                }
+
+                const embed = new EmbedBuilder()
+                    .setColor('Aqua')
+                    .setTitle(`💼 DANH MỤC ĐẦU TƯ - ${message.author.username}`)
+                    .setDescription(desc)
+                    .addFields({ name: '📊 Tổng giá trị tài sản Coin', value: `**${formatMoney(totalValue)}**`, inline: false })
+                    .setFooter({ text: 'Dùng !coin ban <MÃ_COIN> <số_lượng> để chốt lời.' });
+
+                return message.reply({ embeds: [embed] });
+            }
+
+            // BẢNG GIÁ THỊ TRƯỜNG CHÍNH
+            let marketText = '';
+            for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
+                const trendEmoji = coin.change > 0 ? '🟢 ▲' : (coin.change < 0 ? '🔴 ▼' : '🟡 ➖');
+                const sign = coin.change > 0 ? '+' : '';
+                marketText += `${trendEmoji} **${coin.name} (${symbol})**: **${formatMoney(coin.price)}** (${sign}${coin.change}%)\n`;
+            }
+
+            const embedMarket = new EmbedBuilder()
+                .setColor('Blurple')
+                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO')
+                .setDescription(`*Thị trường tự động cập nhật giá sau mỗi 10 phút.*\n\n${marketText}`)
+                .addFields(
+                    { name: '📈 Xem biểu đồ', value: '`!coin chart <MÃ_COIN>`', inline: true },
+                    { name: '🛒 Mua coin', value: '`!coin mua <MÃ_COIN> <SL>`', inline: true },
+                    { name: '💰 Bán coin', value: '`!coin ban <MÃ_COIN> <SL>`', inline: true }
+                )
+                .setFooter({ text: 'Gợi ý: Dùng !coin chart BTC để xem trực quan biểu đồ giá!' });
+
+            return message.reply({ embeds: [embedMarket] });
+        }
+
+        // 🏦 HỆ THỐNG VAY TIỀN & TRẢ NỢ - LÃI SUẤT 30%
         if (command === 'vay' || command === 'vaytien') {
             const amount = parseInt(args[0], 10);
             const currentDebt = getLoan(userId);
@@ -815,12 +1010,12 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embedPay] });
         }
 
-        // 📦 EXPORT BACKUP DỮ LIỆU SỐ DƯ & CẤU HÌNH
+        // BACKUP & EXPORT
         if (command === 'exportdata' || command === 'backupdata') {
             if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền export dữ liệu!');
             
             const attachments = [];
-            for (const [key, filePath] of Object.entries(FILES)) {
+            for (const filePath of Object.values(FILES)) {
                 if (fs.existsSync(filePath)) {
                     attachments.push(new AttachmentBuilder(filePath));
                 }
@@ -830,7 +1025,7 @@ client.on('messageCreate', async message => {
             return message.reply('✅ Đã gửi toàn bộ file JSON lưu trữ số dư & dữ liệu vào tin nhắn riêng của bạn!');
         }
 
-        // 📥 IMPORT/RESTORE KHÔI PHÚC DỮ LIỆU TỪ FILE DISCORD DÙNG CHO ADMIN
+        // RESTORE / IMPORT
         if (command === 'importdata' || command === 'restoredata') {
             if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền import khôi phục dữ liệu!');
 
@@ -850,43 +1045,41 @@ client.on('messageCreate', async message => {
             else if (fileName.includes('word_config')) targetPath = FILES.WORD_CONFIG;
             else if (fileName.includes('lode_config')) targetPath = FILES.LODE_CONFIG;
             else if (fileName.includes('loans')) targetPath = FILES.LOANS;
+            else if (fileName.includes('crypto')) targetPath = FILES.CRYPTO;
+            else if (fileName.includes('portfolio')) targetPath = FILES.PORTFOLIO;
 
             if (!targetPath) {
-                return message.reply('❌ File đính kèm không đúng định dạng tên! (Cần chứa một trong các tên: `balances.json`, `titles.json`, `loans.json`, `staffs.json`,...)');
+                return message.reply('❌ File đính kèm không đúng định dạng tên!');
             }
 
             try {
                 const response = await axios.get(attachment.url);
-                const importedData = response.data;
+                fs.writeFileSync(targetPath, JSON.stringify(response.data, null, 2), 'utf8');
 
-                fs.writeFileSync(targetPath, JSON.stringify(importedData, null, 2), 'utf8');
+                balances = loadJSON(FILES.BALANCES);
+                customTitles = loadJSON(FILES.TITLES);
+                config = loadJSON(FILES.CONFIG, false);
+                staffList = loadJSON(FILES.STAFFS, false);
+                lotteryData = loadJSON(FILES.LOTTERY, false);
+                wordConfig = loadJSON(FILES.WORD_CONFIG, false);
+                lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
+                loans = loadJSON(FILES.LOANS);
+                cryptoMarket = loadJSON(FILES.CRYPTO, false);
+                portfolios = loadJSON(FILES.PORTFOLIO);
 
-                if (targetPath === FILES.BALANCES) balances = loadJSON(FILES.BALANCES);
-                if (targetPath === FILES.TITLES) customTitles = loadJSON(FILES.TITLES);
-                if (targetPath === FILES.CONFIG) config = loadJSON(FILES.CONFIG, false);
-                if (targetPath === FILES.STAFFS) staffList = loadJSON(FILES.STAFFS, false);
-                if (targetPath === FILES.LOTTERY) lotteryData = loadJSON(FILES.LOTTERY, false);
-                if (targetPath === FILES.WORD_CONFIG) wordConfig = loadJSON(FILES.WORD_CONFIG, false);
-                if (targetPath === FILES.LODE_CONFIG) lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
-                if (targetPath === FILES.LOANS) loans = loadJSON(FILES.LOANS);
-
-                return message.reply(`✅ Khôi phục thành công dữ liệu cho file **${fileName}**! Hệ thống đã tự động cập nhật.`);
+                return message.reply(`✅ Khôi phục thành công dữ liệu cho file **${fileName}**!`);
             } catch (err) {
                 console.error('[Import Error]:', err);
-                return message.reply('❌ Lỗi khi tải hoặc ghi đè file dữ liệu! Vui lòng kiểm tra định dạng file JSON.');
+                return message.reply('❌ Lỗi khi tải hoặc ghi đè file dữ liệu!');
             }
         }
 
-        // 🛠️ QUẢN LÝ DANH SÁCH STAFF
         if (command === 'addstaff') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền thêm Staff!');
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền thêm Staff!');
             const targetUser = message.mentions.users.first();
             if (!targetUser) return message.reply('❌ Cú pháp: `!addstaff @user`');
 
-            if (staffList.users.includes(targetUser.id)) {
-                return message.reply(`⚠️ ${targetUser} đã là Staff rồi!`);
-            }
-
+            if (staffList.users.includes(targetUser.id)) return message.reply(`⚠️ ${targetUser} đã là Staff rồi!`);
             staffList.users.push(targetUser.id);
             saveJSONSync(FILES.STAFFS, staffList);
 
@@ -894,13 +1087,9 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'delstaff' || command === 'removestaff') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền xóa Staff!');
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền xóa Staff!');
             const targetUser = message.mentions.users.first();
             if (!targetUser) return message.reply('❌ Cú pháp: `!delstaff @user`');
-
-            if (!staffList.users.includes(targetUser.id)) {
-                return message.reply(`⚠️ ${targetUser} không phải là Staff!`);
-            }
 
             staffList.users = staffList.users.filter(id => id !== targetUser.id);
             saveJSONSync(FILES.STAFFS, staffList);
@@ -909,34 +1098,20 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'stafflist' || command === 'dsstaff') {
-            if (staffList.users.length === 0) {
-                return message.reply('📌 Hiện chưa có Staff nào trong danh sách.');
-            }
-
+            if (staffList.users.length === 0) return message.reply('📌 Hiện chưa có Staff nào.');
             const staffMentions = staffList.users.map((id, index) => `${index + 1}. <@${id}> (\`${id}\`)`).join('\n');
-            const embed = new EmbedBuilder()
-                .setColor('Aqua')
-                .setTitle('🛡️ DANH SÁCH STAFF BẢO TRÌ BOT')
-                .setDescription(staffMentions)
-                .setTimestamp();
-
+            const embed = new EmbedBuilder().setColor('Aqua').setTitle('🛡️ DANH SÁCH STAFF').setDescription(staffMentions);
             return message.reply({ embeds: [embed] });
         }
 
-        // 💰 LỆNH CỘNG VÀ TRỪ TIỀN
         if (command === 'cong' || command === 'addmoney') {
             if (!isBotStaff(userId)) return message.reply('❌ Chỉ **Staff** hoặc **Bot Owner** mới được dùng lệnh này!');
             const targetUser = message.mentions.users.first();
             const amount = parseInt(args[1], 10);
+            if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('❌ Cú pháp: `!cong @user <số_tiền>`');
 
-            if (!targetUser || isNaN(amount) || amount <= 0) {
-                return message.reply('❌ Cú pháp: `!cong @user <số_tiền>`');
-            }
-
-            let bal = getBalance(targetUser.id);
-            bal += amount;
+            let bal = getBalance(targetUser.id) + amount;
             setBalance(targetUser.id, bal);
-
             return message.reply(`✅ Đã cộng **+${formatMoney(amount)}** cho ${targetUser}. Số dư mới: **${formatMoney(bal)}**.`);
         }
 
@@ -944,32 +1119,25 @@ client.on('messageCreate', async message => {
             if (!isBotStaff(userId)) return message.reply('❌ Chỉ **Staff** hoặc **Bot Owner** mới được dùng lệnh này!');
             const targetUser = message.mentions.users.first();
             const amount = parseInt(args[1], 10);
+            if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('❌ Cú pháp: `!tru @user <số_tiền>`');
 
-            if (!targetUser || isNaN(amount) || amount <= 0) {
-                return message.reply('❌ Cú pháp: `!tru @user <số_tiền>`');
-            }
-
-            let bal = getBalance(targetUser.id);
-            bal = Math.max(0, bal - amount);
+            let bal = Math.max(0, getBalance(targetUser.id) - amount);
             setBalance(targetUser.id, bal);
-
             return message.reply(`📉 Đã trừ **-${formatMoney(amount)}** của ${targetUser}. Số dư mới: **${formatMoney(bal)}**.`);
         }
 
-        // 👑 LỆNH ĐẶC QUYỀN RIÊNG CỦA BOT OWNER
         if (command === 'resetmoney') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền reset ví!');
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền!');
             const targetUser = message.mentions.users.first();
             if (!targetUser) return message.reply('❌ Hãy tag người cần reset!');
-
             setBalance(targetUser.id, 50000);
             return message.reply(`🔄 Đã reset ví của ${targetUser} về **50.000đ**.`);
         }
 
         if (command === 'settitle' || command === 'resettitle') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền chỉnh danh hiệu!');
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền!');
             const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!settitle @user <tên_danh_hiệu>`');
+            if (!targetUser) return message.reply('❌ Cú pháp: `!settitle @user <tên>`');
 
             if (command === 'resettitle') {
                 customTitles.delete(targetUser.id);
@@ -978,50 +1146,42 @@ client.on('messageCreate', async message => {
             }
 
             const newTitle = args.slice(1).join(' ');
-            if (!newTitle) return message.reply('❌ Vui lòng nhập tên danh hiệu!');
-
             customTitles.set(targetUser.id, newTitle);
             saveJSONSync(FILES.TITLES, customTitles);
-
             return message.reply(`✨ Đã đặt danh hiệu cho ${targetUser}: **${newTitle}**`);
         }
 
         if (command === 'forcedraw') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền!');
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner** mới có quyền!');
             await processLotteryDraw();
             return message.reply('⚡ Đã ép kích hoạt quay thưởng Xổ Số & Lô Đề!');
         }
 
-        // 🎟️ LỆNH VÉ SỐ & LÔ ĐỀ
         if (['veso', 'muaveso'].includes(command)) {
             const subCmd = args[0]?.toLowerCase();
             const TICKET_PRICE = 10000;
 
             if (subCmd === 'mua') {
                 const number = args[1];
-                if (!number || !/^\d{6}$/.test(number)) {
-                    return message.reply('❌ Vé số gồm 6 chữ số! Cú pháp: `!veso mua <6_chữ_số>`');
-                }
+                if (!number || !/^\d{6}$/.test(number)) return message.reply('❌ Cú pháp: `!veso mua <6_chữ_số>`');
 
                 const bal = getBalance(userId);
-                if (bal < TICKET_PRICE) return message.reply(`❌ Bạn không đủ tiền! Giá vé: **${formatMoney(TICKET_PRICE)}**.`);
+                if (bal < TICKET_PRICE) return message.reply(`❌ Số dư không đủ! Giá vé: **${formatMoney(TICKET_PRICE)}**.`);
 
                 setBalance(userId, bal - TICKET_PRICE);
                 lotteryData.tickets.push({ userId, number });
                 saveJSONSync(FILES.LOTTERY, lotteryData);
 
-                return message.reply(`🎟️ Mua thành công vé số **"${number}"**! Kết quả quay vào **18:00 hàng ngày**.`);
+                return message.reply(`🎟️ Mua thành công vé số **"${number}"**!`);
             }
 
             const myTickets = lotteryData.tickets.filter(t => t.userId === userId);
-            const ticketList = myTickets.length > 0 ? myTickets.map(t => `• **${t.number}**`).join('\n') : 'Chưa mua vé nào hôm nay.';
+            const ticketList = myTickets.length > 0 ? myTickets.map(t => `• **${t.number}**`).join('\n') : 'Chưa mua vé nào.';
 
             const embed = new EmbedBuilder()
                 .setColor('Gold')
-                .setTitle('🎟️ VÉ SỐ KIẾN THIẾT (QUAY TỰ ĐỘNG 18:00)')
-                .setDescription(`• Giá vé: **${formatMoney(TICKET_PRICE)}/vé**\n• Giải Đặc Biệt: **100.000.000đ**\n\n📌 **Vé của bạn hôm nay:**\n${ticketList}`)
-                .setFooter({ text: 'Mua vé: !veso mua <6_chữ_số>' });
-
+                .setTitle('🎟️ VÉ SỐ KIẾN THIẾT (18:00)')
+                .setDescription(`• Giá vé: **${formatMoney(TICKET_PRICE)}**\n• Giải Đặc Biệt: **100.000.000đ**\n\n📌 **Vé của bạn:**\n${ticketList}`);
             return message.reply({ embeds: [embed] });
         }
 
@@ -1037,188 +1197,124 @@ client.on('messageCreate', async message => {
             }
 
             if (!['de', 'lo'].includes(type) || !num || !/^\d{2}$/.test(num) || isNaN(bet) || bet <= 0) {
-                return message.reply('❌ Cú pháp Lô Đề:\n• Đề (1 ăn 70): `!lode de <2_chữ_số> <tiền_cược>`\n• Lô (1 ăn 3.5): `!lode lo <2_chữ_số> <tiền_cược>`');
+                return message.reply('❌ Cú pháp: `!lode de <2_số> <tiền>` hoặc `!lode lo <2_số> <tiền>`');
             }
 
             const bal = getBalance(userId);
-            if (bet > bal) return message.reply(`❌ Số dư không đủ! Số dư: **${formatMoney(bal)}**.`);
+            if (bet > bal) return message.reply(`❌ Số dư không đủ!`);
 
             setBalance(userId, bal - bet);
             lotteryData.lodeBets.push({ userId, type, number: num, amount: bet });
             saveJSONSync(FILES.LOTTERY, lotteryData);
 
-            return message.reply(`🎯 Đã cược **${type.toUpperCase()}${num}** với **${formatMoney(bet)}**! Trả thưởng lúc **18:00**.`);
+            return message.reply(`🎯 Đã cược **${type.toUpperCase()}${num}** với **${formatMoney(bet)}**!`);
         }
 
         if (['ketqua', 'kqxs'].includes(command)) {
-            if (!lotteryData.lastResult) return message.reply('❌ Chưa có kết quả xổ số nào!');
+            if (!lotteryData.lastResult) return message.reply('❌ Chưa có kết quả xổ số!');
             const res = lotteryData.lastResult;
             const embed = new EmbedBuilder()
                 .setColor('Orange')
                 .setTitle('🎰 KẾT QUẢ XỔ SỐ GẦN NHẤT')
                 .addFields(
-                    { name: '🏆 Giải Đặc Biệt (Vé Số)', value: `🎉 **${res.specialPrize}**`, inline: false },
-                    { name: '🎯 Số Đề', value: `🔥 **${res.specialPrize.slice(-2)}**`, inline: true },
+                    { name: '🏆 G.Đặc Biệt', value: `🎉 **${res.specialPrize}**`, inline: false },
                     { name: '🎲 27 Giải Lô', value: `\`${res.loResults.join(' - ')}\``, inline: false }
                 );
-
             return message.reply({ embeds: [embed] });
         }
 
-        // CÀI ĐẶT KÊNH THÔNG BÁO LÔ ĐỀ 18H
-        if (command === 'setlode' || command === 'setlodechannel') {
-            const isGuildAdmin = message.member.permissions.has('Administrator');
-            if (!isBotStaff(userId) && !isGuildAdmin) return message.reply('❌ Bạn không có quyền Administrator hoặc Staff!');
-
+        if (command === 'setlode') {
+            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('❌ Không có quyền!');
             const targetChannel = message.mentions.channels.first() || message.channel;
             lodeConfig[guildId] = targetChannel.id;
             saveJSONSync(FILES.LODE_CONFIG, lodeConfig);
-
-            return message.reply(`✅ Đã thiết lập kênh thông báo KQXS & Lô Đề (18:00) tại ${targetChannel}.`);
+            return message.reply(`✅ Đã thiết lập kênh Lô Đề tại ${targetChannel}.`);
         }
 
-        // CÀI ĐẶT KÊNH TÀI XỈU
-        if (command === 'settaixiu' || command === 'setkenhtaixiu') {
-            const isGuildAdmin = message.member.permissions.has('Administrator');
-            if (!isBotStaff(userId) && !isGuildAdmin) return message.reply('❌ Bạn không có quyền Administrator hoặc Staff!');
-
+        if (command === 'settaixiu') {
+            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('❌ Không có quyền!');
             const targetChannel = message.mentions.channels.first() || message.channel;
             const txSession = getSession(guildId);
             txSession.channelId = targetChannel.id;
             saveTaiXiuState(guildId, txSession);
-
             await message.reply(`✅ Đã thiết lập kênh Tài Xỉu tại ${targetChannel}.`);
             startTaiXiuLoop(guildId, targetChannel.id);
             return;
         }
 
-        // CÀI ĐẶT KÊNH NỐI TỪ
         if (command === 'setnoitu') {
-            const isGuildAdmin = message.member.permissions.has('Administrator');
-            if (!isBotStaff(userId) && !isGuildAdmin) return message.reply('❌ Bạn không có quyền Administrator hoặc Staff!');
-
+            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('❌ Không có quyền!');
             const targetChannel = message.mentions.channels.first() || message.channel;
             wordConfig[guildId] = targetChannel.id;
             saveJSONSync(FILES.WORD_CONFIG, wordConfig);
-
-            const session = getWordSession(guildId);
             startWordGameTimeout(guildId, targetChannel);
-
-            return message.reply(`✅ Đã thiết lập kênh Nối Từ tại ${targetChannel}.\n🔤 Từ bắt đầu: **"${session.currentWord}"**.`);
+            return message.reply(`✅ Đã thiết lập kênh Nối Từ tại ${targetChannel}.`);
         }
 
-        // GAME BLACKJACK
         if (command === 'blackjack' || command === 'bj') {
             const gameKey = `${guildId}_${userId}`;
-            if (bjGames.has(gameKey)) return message.reply('❌ Bạn đang trong một ván đấu chưa kết thúc!');
+            if (bjGames.has(gameKey)) return message.reply('❌ Bạn đang trong ván đấu khác!');
 
             const bet = parseInt(args[0], 10);
-            if (isNaN(bet) || bet <= 0) return message.reply('❌ Cú pháp: `!bj <số_tiền_cược>`');
+            if (isNaN(bet) || bet <= 0) return message.reply('❌ Cú pháp: `!bj <số_tiền>`');
 
             const bal = getBalance(userId);
-            if (bet > bal) return message.reply(`❌ Số dư không đủ! Hiện có **${formatMoney(bal)}**.`);
+            if (bet > bal) return message.reply(`❌ Số dư không đủ!`);
 
             const deck = createDeck();
             const playerHand = [deck.pop(), deck.pop()];
             const dealerHand = [deck.pop(), deck.pop()];
 
             const timeout = setTimeout(() => bjGames.delete(gameKey), 180000);
-            const game = { user: message.author, bet, deck, playerHand, dealerHand, timeout };
-            bjGames.set(gameKey, game);
+            bjGames.set(gameKey, { user: message.author, bet, deck, playerHand, dealerHand, timeout });
 
             const playerScore = calculateHand(playerHand);
-
-            if (playerScore === 21 || (playerHand[0].value === 'A' && playerHand[1].value === 'A')) {
-                clearTimeout(timeout);
-                bjGames.delete(gameKey);
-
-                const embed = new EmbedBuilder()
-                    .setColor('Gold')
-                    .setTitle(`🃏 BLACKJACK - ${message.author.username}`)
-                    .addFields(
-                        { name: '🤖 Nhà Cái', value: `${formatHand(dealerHand)} (${calculateHand(dealerHand)} điểm)` },
-                        { name: '👤 Bạn', value: `${formatHand(playerHand)} (${playerScore} điểm)` }
-                    );
-
-                if (playerHand[0].value === 'A' && playerHand[1].value === 'A') {
-                    const win = bet * 2;
-                    setBalance(userId, bal + win);
-                    embed.setDescription(`🔥 **XÌ BÀN!** Thắng lớn **+${formatMoney(win)}**!`);
-                } else {
-                    const win = Math.floor(bet * 1.5);
-                    setBalance(userId, bal + win);
-                    embed.setDescription(`🏆 **BLACKJACK TỰ NHIÊN!** Thắng **+${formatMoney(win)}**!`);
-                }
-
-                return message.reply({ embeds: [embed] });
-            }
-
             const embed = new EmbedBuilder()
                 .setColor('DarkGreen')
                 .setTitle(`🃏 BLACKJACK - ${message.author.username}`)
                 .addFields(
                     { name: '🤖 Nhà Cái', value: `${formatHand(dealerHand, true)} (?? điểm)` },
                     { name: '👤 Bạn', value: `${formatHand(playerHand)} (${playerScore} điểm)` }
-                )
-                .setFooter({ text: `Tiền cược: ${formatMoney(bet)}` });
+                );
 
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('bj_hit').setLabel('🃏 RÚT (HIT)').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('bj_stand').setLabel('🛑 DẰN (STAND)').setStyle(ButtonStyle.Danger)
+                new ButtonBuilder().setCustomId('bj_hit').setLabel('🃏 RÚT').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('bj_stand').setLabel('🛑 DẰN').setStyle(ButtonStyle.Danger)
             );
 
             return message.reply({ embeds: [embed], components: [row] });
         }
 
-        // LỆNH HƯỚNG DẪN
         if (command === 'hlp' || command === 'giupde') {
             const embed = new EmbedBuilder()
                 .setColor('Random')
                 .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH BOT')
                 .addFields(
-                    { name: '💼 Kinh tế & Ngân hàng', value: '`!profile`, `!sodu`, `!daily`, `!work`, `!trom`, `!chuyen`, `!top`\n• **Vay tiền:** `!vay <số_tiền>` (Lãi suất 30%)\n• **Trả nợ:** `!trano <số_tiền|all>`', inline: false },
-                    { name: '🎲 Mini-Game', value: '• **Tài Xỉu:** Đặt trực tiếp qua nút bấm.\n• **Blackjack:** `!bj <tiền>`\n• **Nối Từ:** Nhập từ trong kênh game.\n• **Vé Số:** `!veso mua <6_chữ_số>`\n• **Lô Đề:** `!lode de/lo <2_chữ_số> <tiền>`\n• **KQXS:** `!ketqua`', inline: false },
-                    { name: '🛡️ Quản trị Staff & Admin', value: '`!cong @user <tiền>`, `!tru @user <tiền>`, `!settaixiu`, `!setnoitu`, `!setlode`, `!noitu reset`', inline: false },
-                    { name: '👑 Bot Owner (Chủ Bot)', value: '`!addstaff @user`, `!delstaff @user`, `!stafflist`, `!resetmoney`, `!settitle`, `!forcedraw`, `!exportdata`, `!importdata` (Đính kèm file)', inline: false }
-                )
-                .setTimestamp();
-
+                    { name: '💼 Kinh tế & Tín dụng', value: '`!profile`, `!daily`, `!work`, `!chuyen`\n• Vay: `!vay <tiền>` (Lãi 30%)\n• Trả nợ: `!trano <tiền|all>`', inline: false },
+                    { name: '📈 Chứng Khoán & Biểu Đồ', value: '• Xem giá: `!coin`\n• **Xem biểu đồ:** `!coin chart <MÃ_COIN>` *(VD: `!coin chart BTC`)*\n• Mua/Bán: `!coin mua/ban <MÃ> <SL>`', inline: false },
+                    { name: '🎲 Mini-Game', value: '• Tài Xỉu (Nút bấm)\n• Blackjack: `!bj <tiền>`\n• Vé Số & Lô Đề (18:00)', inline: false }
+                );
             return message.reply({ embeds: [embed] });
         }
 
-        // PROFILE & CÁC LỆNH KINH TẾ
         if (command === 'profile' || command === 'pf') {
             const targetUser = message.mentions.users.first() || message.author;
             const bal = getBalance(targetUser.id);
             const loan = getLoan(targetUser.id);
-            
             const sorted = Array.from(balances.entries()).sort((a, b) => b[1] - a[1]);
-            const rankIndex = sorted.findIndex(([id]) => id === targetUser.id);
-            const rank = rankIndex !== -1 ? rankIndex + 1 : 'N/A';
+            const rank = sorted.findIndex(([id]) => id === targetUser.id) + 1 || 'N/A';
 
-            let title = customTitles.get(targetUser.id);
-            if (!title) {
-                if (isBotOwner(targetUser.id)) title = '👑 Bot Owner / Admin Tối Cao 👑';
-                else if (isBotStaff(targetUser.id)) title = '🛡️ Ban Quản Trị / Staff 🛡️';
-                else if (bal >= 10000000) title = 'Tỷ phú sòng bạc 💎';
-                else if (bal >= 5000000) title = 'Đại gia khét tiếng 👑';
-                else if (bal >= 2000000) title = 'Tay chơi thứ thiệt 🔥';
-                else if (bal >= 500000) title = 'Dân chơi tiềm năng ✨';
-                else title = 'Người mới bắt đầu 🌱';
-            }
+            let title = customTitles.get(targetUser.id) || (bal >= 5000000 ? 'Đại gia 👑' : 'Thành viên 🌱');
 
             const embed = new EmbedBuilder()
                 .setColor('Blurple')
                 .setTitle(`🪪 HỒ SƠ - ${targetUser.username}`)
-                .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: '💰 Số dư', value: `**${formatMoney(bal)}**`, inline: true },
                     { name: '💳 Tiền nợ', value: `**${formatMoney(loan)}**`, inline: true },
-                    { name: '🏆 BXH Toàn Cầu', value: `**#${rank}**`, inline: true },
+                    { name: '🏆 BXH', value: `**#${rank}**`, inline: true },
                     { name: '🎖️ Danh hiệu', value: `**${title}**`, inline: false }
-                )
-                .setTimestamp();
-
+                );
             return message.reply({ embeds: [embed] });
         }
 
@@ -1228,99 +1324,40 @@ client.on('messageCreate', async message => {
 
         if (command === 'daily') {
             const now = Date.now();
-            const lastDaily = dailyCooldown.get(userId) || 0;
-            const cooldown = 86400000;
-
-            if (now - lastDaily < cooldown) {
-                const hoursLeft = Math.ceil((cooldown - (now - lastDaily)) / 3600000);
-                return message.reply(`⏰ Bạn đã điểm danh hôm nay rồi! Quay lại sau **${hoursLeft} giờ**.`);
-            }
-
+            if (now - (dailyCooldown.get(userId) || 0) < 86400000) return message.reply('⏰ Đã điểm danh hôm nay rồi!');
             const bonus = 100000;
-            const newBal = getBalance(userId) + bonus;
-            setBalance(userId, newBal);
+            setBalance(userId, getBalance(userId) + bonus);
             dailyCooldown.set(userId, now);
-
-            return message.reply(`🎁 Nhận điểm danh **${formatMoney(bonus)}**! Số dư mới: **${formatMoney(newBal)}**.`);
+            return message.reply(`🎁 Điểm danh nhận **${formatMoney(bonus)}**!`);
         }
 
         if (command === 'work') {
             const now = Date.now();
-            const lastWork = workCooldown.get(userId) || 0;
-            const cooldown = 1800000;
-
-            if (now - lastWork < cooldown) {
-                const minsLeft = Math.ceil((cooldown - (now - lastWork)) / 60000);
-                return message.reply(`☕ Nghỉ ngơi thêm **${minsLeft} phút** nữa nhé!`);
-            }
-
-            const jobs = [
-                { name: 'phụ hồ', pay: 20000 },
-                { name: 'lập trình viên thuê', pay: 80000 },
-                { name: 'streamer game', pay: 50000 },
-                { name: 'bán vé số', pay: 10000 }
-            ];
-            const job = jobs[Math.floor(Math.random() * jobs.length)];
-            const newBal = getBalance(userId) + job.pay;
-
-            setBalance(userId, newBal);
+            if (now - (workCooldown.get(userId) || 0) < 1800000) return message.reply('☕ Hãy nghỉ ngơi thêm chút nữa!');
+            const pay = 50000;
+            setBalance(userId, getBalance(userId) + pay);
             workCooldown.set(userId, now);
-
-            return message.reply(`💼 Bạn làm **${job.name}** và nhận được **${formatMoney(job.pay)}**!`);
-        }
-
-        if (command === 'trom' || command === 'crime') {
-            const now = Date.now();
-            const lastCrime = crimeCooldown.get(userId) || 0;
-            const cooldown = 3600000;
-
-            if (now - lastCrime < cooldown) {
-                const minsLeft = Math.ceil((cooldown - (now - lastCrime)) / 60000);
-                return message.reply(`🚨 Cảnh sát đang trực! Quay lại sau **${minsLeft} phút**.`);
-            }
-
-            crimeCooldown.set(userId, now);
-            let bal = getBalance(userId);
-
-            if (Math.random() < 0.5) {
-                const loot = Math.floor(Math.random() * 100000) + 20000;
-                setBalance(userId, bal + loot);
-                return message.reply(`🦹 Trộm thành công **${formatMoney(loot)}**!`);
-            } else {
-                const fine = Math.floor(Math.random() * 50000) + 10000;
-                setBalance(userId, bal - fine);
-                return message.reply(`👮 Bị công an phạt mất **${formatMoney(fine)}**!`);
-            }
+            return message.reply(`💼 Làm việc kiếm được **${formatMoney(pay)}**!`);
         }
 
         if (command === 'chuyen' || command === 'pay') {
             const targetUser = message.mentions.users.first();
             const amount = parseInt(args[1], 10);
-
             if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('❌ Cú pháp: `!chuyen @user <số_tiền>`');
-            if (targetUser.id === userId) return message.reply('❌ Không thể tự chuyển cho chính mình!');
+            if (targetUser.id === userId) return message.reply('❌ Không thể tự chuyển!');
 
             const senderBal = getBalance(userId);
-            if (senderBal < amount) return message.reply(`❌ Số dư không đủ! Hiện có: **${formatMoney(senderBal)}**.`);
+            if (senderBal < amount) return message.reply('❌ Số dư không đủ!');
 
             setBalance(userId, senderBal - amount);
             setBalance(targetUser.id, getBalance(targetUser.id) + amount);
-
             return message.reply(`💸 Đã chuyển **${formatMoney(amount)}** cho ${targetUser}!`);
         }
 
         if (command === 'top' || command === 'bxh') {
             const sorted = Array.from(balances.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
-            let desc = sorted.map(([id, bal], i) => {
-                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🪙';
-                return `${medal} **Top ${i + 1}**: <@${id}> - **${formatMoney(bal)}**`;
-            }).join('\n');
-
-            const embed = new EmbedBuilder()
-                .setTitle('🏆 BẢNG XẾP HẠNG ĐẠI GIA TOÀN CẦU 🏆')
-                .setDescription(desc || 'Chưa có dữ liệu.')
-                .setColor('Gold');
-
+            let desc = sorted.map(([id, bal], i) => `🪙 **Top ${i + 1}**: <@${id}> - **${formatMoney(bal)}**`).join('\n');
+            const embed = new EmbedBuilder().setTitle('🏆 BẢNG XẾP HẠNG ĐẠI GIA').setDescription(desc || 'Chưa có dữ liệu.').setColor('Gold');
             return message.reply({ embeds: [embed] });
         }
 
