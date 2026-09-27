@@ -1,22 +1,23 @@
 const { 
     Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, 
-    ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle 
+    ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle,
+    AttachmentBuilder
 } = require('discord.js');
 const fs = require('fs');
 const express = require('express');
 
 // ==========================================
-// 1. TẠO WEB SERVER GIỮ BOT SỐNG TRÊN RENDER
+// 1. WEB SERVER GIỮ BOT SỐNG TRÊN RENDER
 // ==========================================
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('Bot Discord đang chạy trực tuyến trên Render!');
+    res.send('Bot Discord Casino & Game đang hoạt động!');
 });
 
 app.listen(PORT, () => {
-    console.log(`🌐 Web server HTTP đang mở tại port ${PORT} (Dành cho Render Health Check)`);
+    console.log(`🌐 Web server HTTP mở tại port ${PORT}`);
 });
 
 // ==========================================
@@ -38,13 +39,14 @@ const ADMIN_ID = process.env.ADMIN_ID || '1498554147304247296';
 const FILES = {
     BALANCES: './balances.json',
     TITLES: './titles.json',
-    CONFIG: './config.json',
-    WORD_CONFIG: './word_config.json'
+    CONFIG: './config.json',           // Cấu hình & Lịch sử Tài Xỉu
+    WORD_CONFIG: './word_config.json', // Kênh Nối Từ
+    LODE_CONFIG: './lode_config.json', // Kênh Lô Đề 18h
+    LOTTERY: './lottery.json',         // Vé số, Cược Lô Đề & KQXS
+    STAFFS: './staffs.json'            // File lưu danh sách Staff
 };
 
-// DATA MANAGERS WITH BUFFERED WRITE
-const saveBuffers = new Map();
-
+// DATA MANAGERS & AUTO-SAVE IMMEDIATELY
 const loadJSON = (file, isMap = true) => {
     if (!fs.existsSync(file)) return isMap ? new Map() : {};
     try {
@@ -56,22 +58,28 @@ const loadJSON = (file, isMap = true) => {
     }
 };
 
-const saveJSON = (file, data) => {
-    if (saveBuffers.has(file)) clearTimeout(saveBuffers.get(file));
-    
-    saveBuffers.set(file, setTimeout(() => {
-        const serialized = data instanceof Map ? JSON.stringify(Array.from(data.entries())) : JSON.stringify(data, null, 2);
-        fs.writeFile(file, serialized, 'utf8', (err) => {
-            if (err) console.error(`[Data Save Error] ${file}:`, err.message);
-        });
-        saveBuffers.delete(file);
-    }, 1000));
+const saveJSONSync = (file, data) => {
+    try {
+        const serialized = data instanceof Map ? JSON.stringify(Array.from(data.entries()), null, 2) : JSON.stringify(data, null, 2);
+        fs.writeFileSync(file, serialized, 'utf8');
+    } catch (err) {
+        console.error(`[Data Save Error] ${file}:`, err.message);
+    }
 };
 
+// NẠP DỮ LIỆU TỪ FILE JSON KHI KHỞI ĐỘNG
 const balances = loadJSON(FILES.BALANCES);
 const customTitles = loadJSON(FILES.TITLES);
 const config = loadJSON(FILES.CONFIG, false);
 const wordConfig = loadJSON(FILES.WORD_CONFIG, false);
+const lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
+const lotteryData = loadJSON(FILES.LOTTERY, false);
+const staffList = loadJSON(FILES.STAFFS, false);
+
+if (!lotteryData.tickets) lotteryData.tickets = [];
+if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
+if (!lotteryData.lastResult) lotteryData.lastResult = null;
+if (!Array.isArray(staffList.users)) staffList.users = [];
 
 const dailyCooldown = new Map();
 const workCooldown = new Map();
@@ -80,10 +88,12 @@ const guildSessions = new Map();
 const bjGames = new Map();
 const wordGameSessions = new Map();
 
-// BỘ LƯU CACHE TỪ ĐIỂN ĐỂ TRÁNH GỌI API Quá NHIỀU
 const dictionaryCache = new Map();
 
-// HÀM TRA CỨU TỪ ĐIỂN TIẾNG VIỆT VIA WIKTIONARY API
+// HELPER CHECK QUYỀN
+const isBotOwner = (userId) => userId === ADMIN_ID;
+const isBotStaff = (userId) => isBotOwner(userId) || staffList.users.includes(userId);
+
 async function checkVietnameseWordOnline(word) {
     if (dictionaryCache.has(word)) return dictionaryCache.get(word);
 
@@ -96,19 +106,35 @@ async function checkVietnameseWordOnline(word) {
         if (!pages) return false;
 
         const pageId = Object.keys(pages)[0];
-        const isValid = pageId !== "-1"; // -1 nghĩa là từ này không tồn tại trên từ điển
+        const isValid = pageId !== "-1";
 
         dictionaryCache.set(word, isValid);
         return isValid;
     } catch (error) {
         console.error("[Dictionary API Error]:", error);
-        return true; // Nếu API lỗi tạm thời thì cho qua để tránh gián đoạn cuộc chơi
+        return true;
     }
 }
 
-// DANH SÁCH TỪ BẮT ĐẦU VÁN MỚI
 const START_WORDS = ['phát triển', 'học tập', 'máy tính', 'yêu thương', 'thành công', 'gia đình', 'hy vọng', 'tương lai', 'thành phố', 'văn hóa'];
 
+// HELPER FUNCTIONS FOR MONEY WITH AUTO-SAVE
+const formatMoney = (amount) => Number(amount).toLocaleString('vi-VN') + 'đ';
+
+const getBalance = (userId) => {
+    if (!balances.has(userId)) {
+        balances.set(userId, 50000);
+        saveJSONSync(FILES.BALANCES, balances);
+    }
+    return balances.get(userId);
+};
+
+const setBalance = (userId, amount) => {
+    balances.set(userId, Math.max(0, amount));
+    saveJSONSync(FILES.BALANCES, balances); // Ghi đĩa ngay lập tức
+};
+
+// GAME NỐI TỪ SESSION
 const getWordSession = (guildId) => {
     if (!wordGameSessions.has(guildId)) {
         const randomWord = START_WORDS[Math.floor(Math.random() * START_WORDS.length)];
@@ -122,50 +148,59 @@ const getWordSession = (guildId) => {
     return wordGameSessions.get(guildId);
 };
 
-// ĐẶT LẠI THỜI GIAN CHỜ 3 PHÚT CHO TRÒ NỐI TỪ
 const startWordGameTimeout = (guildId, channel) => {
     const session = getWordSession(guildId);
     if (session.timeoutId) clearTimeout(session.timeoutId);
 
     session.timeoutId = setTimeout(async () => {
+        const lastUser = session.lastUserId;
+        const PENALTY_TIMEOUT = 10000;
+
+        let penaltyMsg = '';
+        if (lastUser) {
+            const currentBal = getBalance(lastUser);
+            setBalance(lastUser, currentBal - PENALTY_TIMEOUT);
+            penaltyMsg = `\n💥 <@${lastUser}> bị phạt **-${formatMoney(PENALTY_TIMEOUT)}** vì để ván đấu bị gián đoạn quá 3 phút!`;
+        }
+
         const newWord = START_WORDS[Math.floor(Math.random() * START_WORDS.length)];
         session.currentWord = newWord;
         session.lastUserId = null;
         session.usedWords = new Set([newWord]);
         session.timeoutId = null;
 
-        await channel.send(`⏳ **Đã quá 3 phút không có ai nối từ!** Ván cũ kết thúc.\n🔄 **Bắt đầu ván mới với từ:** **"${newWord}"**`).catch(() => {});
+        await channel.send(`⏳ **Đã quá 3 phút không có ai nối từ!**${penaltyMsg}\n🔄 **Bắt đầu ván mới với từ:** **"${newWord}"**`).catch(() => {});
     }, 180000);
 };
 
-// HELPER FUNCTIONS
-const formatMoney = (amount) => Number(amount).toLocaleString('vi-VN') + 'đ';
-
-const getBalance = (userId) => {
-    if (!balances.has(userId)) {
-        balances.set(userId, 50000);
-        saveJSON(FILES.BALANCES, balances);
-    }
-    return balances.get(userId);
-};
-
-const setBalance = (userId, amount) => {
-    balances.set(userId, Math.max(0, amount));
-    saveJSON(FILES.BALANCES, balances);
-};
-
+// TÀI XỈU SESSION MANAGER
 const getSession = (guildId) => {
     if (!guildSessions.has(guildId)) {
+        const guildCfg = config[guildId] || {};
+        const channelId = typeof guildCfg === 'string' ? guildCfg : guildCfg.channelId;
+        const savedSessionNumber = typeof guildCfg === 'object' && guildCfg.sessionNumber ? guildCfg.sessionNumber : 1;
+        const savedHistory = typeof guildCfg === 'object' && Array.isArray(guildCfg.history) ? guildCfg.history : [];
+
         guildSessions.set(guildId, {
             isOpen: false,
-            sessionNumber: 1,
+            channelId: channelId,
+            sessionNumber: savedSessionNumber,
             bets: new Map(),
             lastOpenMessage: null,
-            history: [],
+            history: savedHistory,
             timeoutId: null
         });
     }
     return guildSessions.get(guildId);
+};
+
+const saveTaiXiuState = (guildId, session) => {
+    config[guildId] = {
+        channelId: session.channelId,
+        sessionNumber: session.sessionNumber,
+        history: session.history
+    };
+    saveJSONSync(FILES.CONFIG, config);
 };
 
 const getSessionStats = (txSession) => {
@@ -191,6 +226,92 @@ const renderHistoryBridge = (history) => {
     }).join(' ➔ ');
 };
 
+// ==========================================
+// 3. XỔ SỐ & LÔ ĐỀ SYSTEM (18:00)
+// ==========================================
+function generateLotteryResults() {
+    const pad = (num, size) => num.toString().padStart(size, '0');
+    const specialPrize = pad(Math.floor(Math.random() * 1000000), 6);
+    
+    const loResults = [];
+    for (let i = 0; i < 27; i++) {
+        loResults.push(pad(Math.floor(Math.random() * 100), 2));
+    }
+    loResults[0] = specialPrize.slice(-2);
+
+    return { specialPrize, loResults };
+}
+
+async function processLotteryDraw() {
+    console.log('⏰ Bắt đầu quay thưởng Xổ Số & Lô Đề lúc 18:00...');
+    const result = generateLotteryResults();
+    lotteryData.lastResult = result;
+
+    const specialDe = result.specialPrize.slice(-2);
+
+    const ticketWinners = [];
+    for (const ticket of lotteryData.tickets) {
+        if (ticket.number === result.specialPrize) {
+            const PRIZE = 100000000;
+            setBalance(ticket.userId, getBalance(ticket.userId) + PRIZE);
+            ticketWinners.push(`<@${ticket.userId}> (Số: **${ticket.number}**) -> **+${formatMoney(PRIZE)}**`);
+        }
+    }
+
+    const lodeWinners = [];
+    for (const bet of lotteryData.lodeBets) {
+        if (bet.type === 'de') {
+            if (bet.number === specialDe) {
+                const winAmount = bet.amount * 70;
+                setBalance(bet.userId, getBalance(bet.userId) + winAmount);
+                lodeWinners.push(`🎯 <@${bet.userId}> trúng **ĐỀ ${bet.number}** -> **+${formatMoney(winAmount)}**`);
+            }
+        } else if (bet.type === 'lo') {
+            const hitCount = result.loResults.filter(num => num === bet.number).length;
+            if (hitCount > 0) {
+                const winAmount = Math.floor(bet.amount * 3.5 * hitCount);
+                setBalance(bet.userId, getBalance(bet.userId) + winAmount);
+                lodeWinners.push(`🎲 <@${bet.userId}> trúng **LÔ ${bet.number}** (${hitCount} nháy) -> **+${formatMoney(winAmount)}**`);
+            }
+        }
+    }
+
+    lotteryData.tickets = [];
+    lotteryData.lodeBets = [];
+    saveJSONSync(FILES.LOTTERY, lotteryData);
+
+    const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle('🎰 KẾT QUẢ XỔ SỐ & LÔ ĐỀ HÔM NAY (18:00)')
+        .addFields(
+            { name: '🏆 Giải Đặc Biệt (Vé Số)', value: `🎉 **${result.specialPrize}**`, inline: false },
+            { name: '🎯 Số Đề (2 số cuối GĐB)', value: `🔥 **${specialDe}**`, inline: true },
+            { name: '🎲 Kết Quả 27 Giải Lô', value: `\`${result.loResults.join(' - ')}\``, inline: false },
+            { name: '🎉 Người Trúng Vé Số', value: ticketWinners.length > 0 ? ticketWinners.join('\n') : 'Không có ai trúng vé số.', inline: false },
+            { name: '💰 Người Trúng Lô Đề', value: lodeWinners.length > 0 ? lodeWinners.join('\n') : 'Không có ai trúng Lô Đề.', inline: false }
+        )
+        .setTimestamp();
+
+    for (const [guildId, channelId] of Object.entries(lodeConfig)) {
+        if (channelId) {
+            const channel = await client.channels.fetch(channelId).catch(() => null);
+            if (channel) {
+                channel.send({ content: '🔔 **ĐÃ ĐẾN GIỜ QUAY THƯỞNG XỔ SỐ THƯỜNG NIÊN (18:00)!**', embeds: [embed] }).catch(() => {});
+            }
+        }
+    }
+}
+
+function scheduleDailyLottery() {
+    const checkTime = () => {
+        const now = new Date();
+        if (now.getHours() === 18 && now.getMinutes() === 0) {
+            processLotteryDraw();
+        }
+    };
+    setInterval(checkTime, 60000);
+}
+
 // BLACKJACK ENGINE
 const SUITS = ['♠️', '♥️', '♦️', '♣️'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
@@ -210,8 +331,7 @@ const createDeck = () => {
 };
 
 const calculateHand = (hand) => {
-    let score = 0;
-    let aces = 0;
+    let score = 0, aces = 0;
     for (const card of hand) {
         if (card.value === 'A') {
             aces += 1;
@@ -255,6 +375,8 @@ async function updateOpenEmbed(txSession) {
 
 async function startTaiXiuLoop(guildId, channelId) {
     const txSession = getSession(guildId);
+    txSession.channelId = channelId;
+    
     if (txSession.timeoutId) clearTimeout(txSession.timeoutId);
 
     const channel = await client.channels.fetch(channelId).catch(() => null);
@@ -305,7 +427,7 @@ async function startTaiXiuLoop(guildId, channelId) {
         if (txSession.history.length > 10) txSession.history.shift();
 
         const { totalTai, totalXiu } = getSessionStats(txSession);
-        let resultText = `🎲 Kết quả: **${d1} - ${d2} - ${d3}** (Tổng: **${sum}** - **${res === 'bao' ? 'BÃO' : res.toUpperCase()}**)\n`;
+        let resultText = `🎲 Kết quả: **${d1} - ${d2} -${d3}** (Tổng: **${sum}** - **${res === 'bao' ? 'BÃO' : res.toUpperCase()}**)\n`;
         resultText += `📊 Tổng cược: 🔴 **${formatMoney(totalTai)}** | 🔵 **${formatMoney(totalXiu)}**\n\n`;
 
         if (txSession.bets.size === 0) {
@@ -335,6 +457,8 @@ async function startTaiXiuLoop(guildId, channelId) {
         await channel.send({ embeds: [embedResult] }).catch(() => null);
 
         txSession.sessionNumber++;
+        saveTaiXiuState(guildId, txSession);
+
         txSession.timeoutId = setTimeout(runSession, 10000);
     };
 
@@ -343,10 +467,12 @@ async function startTaiXiuLoop(guildId, channelId) {
 
 // EVENTS
 client.once('ready', () => {
-    console.log(`✅ Bot Casino đã đăng nhập thành công: ${client.user.tag}`);
-    for (const [guildId, channelId] of Object.entries(config)) {
+    console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
+    for (const [guildId, guildData] of Object.entries(config)) {
+        const channelId = typeof guildData === 'string' ? guildData : guildData?.channelId;
         if (channelId) startTaiXiuLoop(guildId, channelId);
     }
+    scheduleDailyLottery();
 });
 
 client.on('interactionCreate', async interaction => {
@@ -354,12 +480,12 @@ client.on('interactionCreate', async interaction => {
 
     try {
         const { guildId, channelId, user } = interaction;
-        const targetChannelId = config[guildId];
         const txSession = getSession(guildId);
+        const targetChannelId = txSession.channelId;
 
         if (interaction.isButton() && ['bet_tai', 'bet_xiu'].includes(interaction.customId)) {
             if (channelId !== targetChannelId) {
-                return interaction.reply({ content: '❌ Nút chỉ dùng trong kênh cược được thiết lập!', ephemeral: true });
+                return interaction.reply({ content: '❌ Nút chỉ dùng trong kênh cược!', ephemeral: true });
             }
             if (!txSession.isOpen) {
                 return interaction.reply({ content: '⏳ Hết thời gian đặt cược!', ephemeral: true });
@@ -386,12 +512,12 @@ client.on('interactionCreate', async interaction => {
             const bet = parseInt(interaction.fields.getTextInputValue('bet_amount'), 10);
 
             if (isNaN(bet) || bet <= 0) {
-                return interaction.reply({ content: '❌ Số tiền cược không hợp lệ!', ephemeral: true });
+                return interaction.reply({ content: '❌ Số tiền không hợp lệ!', ephemeral: true });
             }
 
             const bal = getBalance(user.id);
             if (bet > bal) {
-                return interaction.reply({ content: `❌ Số dư không đủ! Số dư hiện tại: **${formatMoney(bal)}**.`, ephemeral: true });
+                return interaction.reply({ content: `❌ Số dư không đủ! Hiện có: **${formatMoney(bal)}**.`, ephemeral: true });
             }
 
             txSession.bets.set(user.id, { choice, amount: bet });
@@ -404,9 +530,7 @@ client.on('interactionCreate', async interaction => {
             const gameKey = `${guildId}_${user.id}`;
             const game = bjGames.get(gameKey);
 
-            if (!game) {
-                return interaction.reply({ content: '❌ Ván đấu đã kết thúc hoặc không tồn tại!', ephemeral: true });
-            }
+            if (!game) return interaction.reply({ content: '❌ Ván đấu đã kết thúc!', ephemeral: true });
 
             if (interaction.customId === 'bj_hit') {
                 game.playerHand.push(game.deck.pop());
@@ -485,13 +609,13 @@ async function finishBlackjackGame(interaction, gameKey, game) {
         setBalance(user.id, currentBal + winAmount);
     } else if (playerScore > dealerScore) {
         winAmount = bet;
-        resultMessage = `🎉 **Thắng trận!** (${playerScore} vs ${dealerScore}). Nhận **+${formatMoney(winAmount)}**.`;
+        resultMessage = `🎉 **Thắng trận!** (${playerScore} vs${dealerScore}). Nhận **+${formatMoney(winAmount)}**.`;
         setBalance(user.id, currentBal + winAmount);
     } else if (playerScore < dealerScore) {
-        resultMessage = `😭 **Nhà cái thắng!** (${dealerScore} vs ${playerScore}). Mất **-${formatMoney(bet)}**.`;
+        resultMessage = `😭 **Nhà cái thắng!** (${dealerScore} vs${playerScore}). Mất **-${formatMoney(bet)}**.`;
         setBalance(user.id, currentBal - bet);
     } else {
-        resultMessage = `🤝 **HÒA!** Bằng điểm (${playerScore}). Hoàn lại tiền cược.`;
+        resultMessage = `🤝 **HÒA!** Bằng điểm (${playerScore}). Hoàn lại tiền.`;
     }
 
     bjGames.delete(gameKey);
@@ -515,9 +639,7 @@ client.on('messageCreate', async message => {
     const guildId = message.guild.id;
     const userId = message.author.id;
 
-    // ==========================================
-    // 3. GAME NỐI TỪ TIẾNG VIỆT (ONLINE DICTIONARY)
-    // ==========================================
+    // KÊNH GAME NỐI TỪ
     if (wordConfig[guildId] && message.channel.id === wordConfig[guildId]) {
         if (message.content.startsWith(PREFIX)) {
             const args = message.content.slice(PREFIX.length).trim().split(/ +/);
@@ -534,112 +656,328 @@ client.on('messageCreate', async message => {
                     timeoutId: null
                 });
                 startWordGameTimeout(guildId, message.channel);
-                return message.reply(`🔄 Đã reset trò chơi nối từ! Từ bắt đầu mới: **"${newWord}"**`);
+                return message.reply(`🔄 Đã reset game Nối Từ! Từ bắt đầu: **"${newWord}"**`);
             }
         }
 
         const inputWord = message.content.trim().toLowerCase();
         const wordParts = inputWord.split(/\s+/);
+        const PENALTY_ERR = 2000;
 
-        // 1. Kiểm tra từ ghép phải đúng 2 tiếng
         if (wordParts.length !== 2) {
+            setBalance(userId, getBalance(userId) - PENALTY_ERR);
+            await message.reply(`❌ Từ **"${inputWord}"** không phải là từ ghép 2 tiếng! (-${formatMoney(PENALTY_ERR)})`);
             return message.react('❌');
         }
 
         const wordSession = getWordSession(guildId);
         const lastWordParts = wordSession.currentWord.split(/\s+/);
-        const requiredStartWord = lastWordParts[lastWordParts.length - 1]; // Tiếng cuối từ trước
+        const requiredStartWord = lastWordParts[lastWordParts.length - 1];
 
-        // 2. Không cho phép 1 người tự nối từ của chính mình
         if (wordSession.lastUserId === userId) {
-            await message.reply('⚠️ Lượt vừa rồi là của bạn! Hãy đợi người khác nối tiếp.');
+            setBalance(userId, getBalance(userId) - PENALTY_ERR);
+            await message.reply(`⚠️ Bạn phải đợi người khác nối tiếp! (-${formatMoney(PENALTY_ERR)})`);
             return message.react('❌');
         }
 
-        // 3. Kiểm tra từ có nối đúng tiếng không
         if (wordParts[0] !== requiredStartWord) {
-            await message.reply(`❌ Từ của bạn phải bắt đầu bằng chữ **"${requiredStartWord}"**! Từ hiện tại: **"${wordSession.currentWord}"**`);
+            setBalance(userId, getBalance(userId) - PENALTY_ERR);
+            await message.reply(`❌ Phải bắt đầu bằng từ **"${requiredStartWord}"**! (-${formatMoney(PENALTY_ERR)})`);
             return message.react('❌');
         }
 
-        // 4. Kiểm tra xem từ đã từng dùng trong ván chưa
         if (wordSession.usedWords.has(inputWord)) {
-            await message.reply(`❌ Từ **"${inputWord}"** đã được sử dụng trước đó rồi!`);
+            setBalance(userId, getBalance(userId) - PENALTY_ERR);
+            await message.reply(`❌ Từ **"${inputWord}"** đã dùng trước đó! (-${formatMoney(PENALTY_ERR)})`);
             return message.react('❌');
         }
 
-        // 5. KIỂM TRA TỪ ĐIỂN TIẾNG VIỆT ONLINE (API)
         const isExistInDict = await checkVietnameseWordOnline(inputWord);
         if (!isExistInDict) {
-            await message.reply(`❌ Từ **"${inputWord}"** không có trong từ điển Tiếng Việt hoặc vô nghĩa!`);
+            setBalance(userId, getBalance(userId) - PENALTY_ERR);
+            await message.reply(`❌ Từ **"${inputWord}"** không có trong từ điển! (-${formatMoney(PENALTY_ERR)})`);
             return message.react('❌');
         }
 
-        // Nối từ thành công!
         wordSession.currentWord = inputWord;
         wordSession.lastUserId = userId;
         wordSession.usedWords.add(inputWord);
 
-        // Cộng thưởng
-        const reward = 5000;
-        setBalance(userId, getBalance(userId) + reward);
+        const REWARD = 5000;
+        setBalance(userId, getBalance(userId) + REWARD);
 
         await message.react('✅');
-
-        // Khởi động lại đếm ngược 3 phút
         startWordGameTimeout(guildId, message.channel);
         return;
     }
 
-    // Các lệnh dùng Prefix `!`
     if (!message.content.startsWith(PREFIX)) return;
 
     try {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        if (command === 'setnoitu') {
-            const isBotAdmin = userId === ADMIN_ID;
-            const isGuildAdmin = message.member.permissions.has('Administrator');
+        // 📦 BACKUP & RESTORE DỮ LIỆU ĐỂ TRÁNH MẤT SỐ DƯ KHI RENDER RESTART
+        if (command === 'exportdata' || command === 'backupdata') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền export dữ liệu!');
+            
+            const attachments = [];
+            for (const [key, filePath] of Object.entries(FILES)) {
+                if (fs.existsSync(filePath)) {
+                    attachments.push(new AttachmentBuilder(filePath));
+                }
+            }
 
-            if (!isBotAdmin && !isGuildAdmin) return message.reply('❌ Bạn không có quyền Administrator!');
+            await message.author.send({ content: '📦 **Dữ liệu backup hiện tại của Bot:**', files: attachments }).catch(() => null);
+            return message.reply('✅ Đã gửi toàn bộ file JSON lưu trữ số dư & dữ liệu vào tin nhắn riêng của bạn!');
+        }
+
+        // 🛠️ QUẢN LÝ DANH SÁCH STAFF
+        if (command === 'addstaff') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền thêm Staff!');
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Cú pháp: `!addstaff @user`');
+
+            if (staffList.users.includes(targetUser.id)) {
+                return message.reply(`⚠️ ${targetUser} đã là Staff rồi!`);
+            }
+
+            staffList.users.push(targetUser.id);
+            saveJSONSync(FILES.STAFFS, staffList);
+
+            return message.reply(`✅ Đã thêm ${targetUser} vào danh sách **Staff**!`);
+        }
+
+        if (command === 'delstaff' || command === 'removestaff') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền xóa Staff!');
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Cú pháp: `!delstaff @user`');
+
+            if (!staffList.users.includes(targetUser.id)) {
+                return message.reply(`⚠️ ${targetUser} không phải là Staff!`);
+            }
+
+            staffList.users = staffList.users.filter(id => id !== targetUser.id);
+            saveJSONSync(FILES.STAFFS, staffList);
+
+            return message.reply(`🗑️ Đã xóa ${targetUser} khỏi danh sách **Staff**.`);
+        }
+
+        if (command === 'stafflist' || command === 'dsstaff') {
+            if (staffList.users.length === 0) {
+                return message.reply('📌 Hiện chưa có Staff nào trong danh sách.');
+            }
+
+            const staffMentions = staffList.users.map((id, index) => `${index + 1}. <@${id}> (\`${id}\`)`).join('\n');
+            const embed = new EmbedBuilder()
+                .setColor('Aqua')
+                .setTitle('🛡️ DANH SÁCH STAFF BẢO TRÌ BOT')
+                .setDescription(staffMentions)
+                .setTimestamp();
+
+            return message.reply({ embeds: [embed] });
+        }
+
+        // 💰 LỆNH CỘNG VÀ TRỪ TIỀN
+        if (command === 'cong' || command === 'addmoney') {
+            if (!isBotStaff(userId)) return message.reply('❌ Chỉ **Staff** hoặc **Bot Owner** mới được dùng lệnh này!');
+            const targetUser = message.mentions.users.first();
+            const amount = parseInt(args[1], 10);
+
+            if (!targetUser || isNaN(amount) || amount <= 0) {
+                return message.reply('❌ Cú pháp: `!cong @user <số_tiền>`');
+            }
+
+            let bal = getBalance(targetUser.id);
+            bal += amount;
+            setBalance(targetUser.id, bal);
+
+            return message.reply(`✅ Đã cộng **+${formatMoney(amount)}** cho ${targetUser}. Số dư mới: **${formatMoney(bal)}**.`);
+        }
+
+        if (command === 'tru' || command === 'removemoney') {
+            if (!isBotStaff(userId)) return message.reply('❌ Chỉ **Staff** hoặc **Bot Owner** mới được dùng lệnh này!');
+            const targetUser = message.mentions.users.first();
+            const amount = parseInt(args[1], 10);
+
+            if (!targetUser || isNaN(amount) || amount <= 0) {
+                return message.reply('❌ Cú pháp: `!tru @user <số_tiền>`');
+            }
+
+            let bal = getBalance(targetUser.id);
+            bal = Math.max(0, bal - amount);
+            setBalance(targetUser.id, bal);
+
+            return message.reply(`📉 Đã trừ **-${formatMoney(amount)}** của ${targetUser}. Số dư mới: **${formatMoney(bal)}**.`);
+        }
+
+        // 👑 LỆNH ĐẶC QUYỀN RIÊNG CỦA BOT OWNER
+        if (command === 'resetmoney') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền reset ví!');
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Hãy tag người cần reset!');
+
+            setBalance(targetUser.id, 50000);
+            return message.reply(`🔄 Đã reset ví của ${targetUser} về **50.000đ**.`);
+        }
+
+        if (command === 'settitle' || command === 'resettitle') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền chỉnh danh hiệu!');
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Cú pháp: `!settitle @user <tên_danh_hiệu>`');
+
+            if (command === 'resettitle') {
+                customTitles.delete(targetUser.id);
+                saveJSONSync(FILES.TITLES, customTitles);
+                return message.reply(`🔄 Đã xóa danh hiệu tùy chỉnh của ${targetUser}.`);
+            }
+
+            const newTitle = args.slice(1).join(' ');
+            if (!newTitle) return message.reply('❌ Vui lòng nhập tên danh hiệu!');
+
+            customTitles.set(targetUser.id, newTitle);
+            saveJSONSync(FILES.TITLES, customTitles);
+
+            return message.reply(`✨ Đã đặt danh hiệu cho ${targetUser}: **${newTitle}**`);
+        }
+
+        if (command === 'forcedraw') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ **Bot Owner (Chủ Bot)** mới có quyền!');
+            await processLotteryDraw();
+            return message.reply('⚡ Đã ép kích hoạt quay thưởng Xổ Số & Lô Đề!');
+        }
+
+        // 🎟️ LỆNH VÉ SỐ & LÔ ĐỀ
+        if (['veso', 'muaveso'].includes(command)) {
+            const subCmd = args[0]?.toLowerCase();
+            const TICKET_PRICE = 10000;
+
+            if (subCmd === 'mua') {
+                const number = args[1];
+                if (!number || !/^\d{6}$/.test(number)) {
+                    return message.reply('❌ Vé số gồm 6 chữ số! Cú pháp: `!veso mua <6_chữ_số>`');
+                }
+
+                const bal = getBalance(userId);
+                if (bal < TICKET_PRICE) return message.reply(`❌ Bạn không đủ tiền! Giá vé: **${formatMoney(TICKET_PRICE)}**.`);
+
+                setBalance(userId, bal - TICKET_PRICE);
+                lotteryData.tickets.push({ userId, number });
+                saveJSONSync(FILES.LOTTERY, lotteryData);
+
+                return message.reply(`🎟️ Mua thành công vé số **"${number}"**! Kết quả quay vào **18:00 hàng ngày**.`);
+            }
+
+            const myTickets = lotteryData.tickets.filter(t => t.userId === userId);
+            const ticketList = myTickets.length > 0 ? myTickets.map(t => `• **${t.number}**`).join('\n') : 'Chưa mua vé nào hôm nay.';
+
+            const embed = new EmbedBuilder()
+                .setColor('Gold')
+                .setTitle('🎟️ VÉ SỐ KIẾN THIẾT (QUAY TỰ ĐỘNG 18:00)')
+                .setDescription(`• Giá vé: **${formatMoney(TICKET_PRICE)}/vé**\n• Giải Đặc Biệt: **100.000.000đ**\n\n📌 **Vé của bạn hôm nay:**\n${ticketList}`)
+                .setFooter({ text: 'Mua vé: !veso mua <6_chữ_số>' });
+
+            return message.reply({ embeds: [embed] });
+        }
+
+        if (['lode', 'de', 'lo'].includes(command)) {
+            let type = args[0]?.toLowerCase();
+            let num = args[1];
+            let bet = parseInt(args[2], 10);
+
+            if (command === 'de' || command === 'lo') {
+                type = command;
+                num = args[0];
+                bet = parseInt(args[1], 10);
+            }
+
+            if (!['de', 'lo'].includes(type) || !num || !/^\d{2}$/.test(num) || isNaN(bet) || bet <= 0) {
+                return message.reply('❌ Cú pháp Lô Đề:\n• Đề (1 ăn 70): `!lode de <2_chữ_số> <tiền_cược>`\n• Lô (1 ăn 3.5): `!lode lo <2_chữ_số> <tiền_cược>`');
+            }
+
+            const bal = getBalance(userId);
+            if (bet > bal) return message.reply(`❌ Số dư không đủ! Số dư: **${formatMoney(bal)}**.`);
+
+            setBalance(userId, bal - bet);
+            lotteryData.lodeBets.push({ userId, type, number: num, amount: bet });
+            saveJSONSync(FILES.LOTTERY, lotteryData);
+
+            return message.reply(`🎯 Đã cược **${type.toUpperCase()}${num}** với **${formatMoney(bet)}**! Trả thưởng lúc **18:00**.`);
+        }
+
+        if (['ketqua', 'kqxs'].includes(command)) {
+            if (!lotteryData.lastResult) return message.reply('❌ Chưa có kết quả xổ số nào!');
+            const res = lotteryData.lastResult;
+            const embed = new EmbedBuilder()
+                .setColor('Orange')
+                .setTitle('🎰 KẾT QUẢ XỔ SỐ GẦN NHẤT')
+                .addFields(
+                    { name: '🏆 Giải Đặc Biệt (Vé Số)', value: `🎉 **${res.specialPrize}**`, inline: false },
+                    { name: '🎯 Số Đề', value: `🔥 **${res.specialPrize.slice(-2)}**`, inline: true },
+                    { name: '🎲 27 Giải Lô', value: `\`${res.loResults.join(' - ')}\``, inline: false }
+                );
+
+            return message.reply({ embeds: [embed] });
+        }
+
+        // CÀI ĐẶT KÊNH THÔNG BÁO LÔ ĐỀ 18H
+        if (command === 'setlode' || command === 'setlodechannel') {
+            const isGuildAdmin = message.member.permissions.has('Administrator');
+            if (!isBotStaff(userId) && !isGuildAdmin) return message.reply('❌ Bạn không có quyền Administrator hoặc Staff!');
+
+            const targetChannel = message.mentions.channels.first() || message.channel;
+            lodeConfig[guildId] = targetChannel.id;
+            saveJSONSync(FILES.LODE_CONFIG, lodeConfig);
+
+            return message.reply(`✅ Đã thiết lập kênh thông báo KQXS & Lô Đề (18:00) tại ${targetChannel}.`);
+        }
+
+        // CÀI ĐẶT KÊNH TÀI XỈU
+        if (command === 'settaixiu' || command === 'setkenhtaixiu') {
+            const isGuildAdmin = message.member.permissions.has('Administrator');
+            if (!isBotStaff(userId) && !isGuildAdmin) return message.reply('❌ Bạn không có quyền Administrator hoặc Staff!');
+
+            const targetChannel = message.mentions.channels.first() || message.channel;
+            const txSession = getSession(guildId);
+            txSession.channelId = targetChannel.id;
+            saveTaiXiuState(guildId, txSession);
+
+            await message.reply(`✅ Đã thiết lập kênh Tài Xỉu tại ${targetChannel}.`);
+            startTaiXiuLoop(guildId, targetChannel.id);
+            return;
+        }
+
+        // CÀI ĐẶT KÊNH NỐI TỪ
+        if (command === 'setnoitu') {
+            const isGuildAdmin = message.member.permissions.has('Administrator');
+            if (!isBotStaff(userId) && !isGuildAdmin) return message.reply('❌ Bạn không có quyền Administrator hoặc Staff!');
 
             const targetChannel = message.mentions.channels.first() || message.channel;
             wordConfig[guildId] = targetChannel.id;
-            saveJSON(FILES.WORD_CONFIG, wordConfig);
+            saveJSONSync(FILES.WORD_CONFIG, wordConfig);
 
             const session = getWordSession(guildId);
             startWordGameTimeout(guildId, targetChannel);
 
-            return message.reply(`✅ Đã thiết lập kênh Nối Từ tại ${targetChannel}.\n🔤 Từ khởi đầu hiện tại: **"${session.currentWord}"**\n⏱️ Mỗi lượt chơi có thời gian chờ là **3 phút**.`);
+            return message.reply(`✅ Đã thiết lập kênh Nối Từ tại ${targetChannel}.\n🔤 Từ bắt đầu: **"${session.currentWord}"**.`);
         }
 
+        // GAME BLACKJACK
         if (command === 'blackjack' || command === 'bj') {
             const gameKey = `${guildId}_${userId}`;
-            if (bjGames.has(gameKey)) {
-                return message.reply('❌ Bạn đang trong một ván Blackjack chưa hoàn thành!');
-            }
+            if (bjGames.has(gameKey)) return message.reply('❌ Bạn đang trong một ván đấu chưa kết thúc!');
 
             const bet = parseInt(args[0], 10);
-            if (isNaN(bet) || bet <= 0) {
-                return message.reply('❌ Cú pháp: `!bj <số_tiền_cược>` (VD: `!bj 50000`)');
-            }
+            if (isNaN(bet) || bet <= 0) return message.reply('❌ Cú pháp: `!bj <số_tiền_cược>`');
 
             const bal = getBalance(userId);
-            if (bet > bal) {
-                return message.reply(`❌ Số dư không đủ! Bạn chỉ có **${formatMoney(bal)}**.`);
-            }
+            if (bet > bal) return message.reply(`❌ Số dư không đủ! Hiện có **${formatMoney(bal)}**.`);
 
             const deck = createDeck();
             const playerHand = [deck.pop(), deck.pop()];
             const dealerHand = [deck.pop(), deck.pop()];
 
-            const timeout = setTimeout(() => {
-                if (bjGames.has(gameKey)) {
-                    bjGames.delete(gameKey);
-                }
-            }, 180000);
-
+            const timeout = setTimeout(() => bjGames.delete(gameKey), 180000);
             const game = { user: message.author, bet, deck, playerHand, dealerHand, timeout };
             bjGames.set(gameKey, game);
 
@@ -660,11 +998,11 @@ client.on('messageCreate', async message => {
                 if (playerHand[0].value === 'A' && playerHand[1].value === 'A') {
                     const win = bet * 2;
                     setBalance(userId, bal + win);
-                    embed.setDescription(`🔥 **XÌ BÀN!** Bạn thắng lớn **+${formatMoney(win)}**!`);
+                    embed.setDescription(`🔥 **XÌ BÀN!** Thắng lớn **+${formatMoney(win)}**!`);
                 } else {
                     const win = Math.floor(bet * 1.5);
                     setBalance(userId, bal + win);
-                    embed.setDescription(`🏆 **BLACKJACK TỰ NHIÊN!** Bạn nhận **+${formatMoney(win)}**!`);
+                    embed.setDescription(`🏆 **BLACKJACK TỰ NHIÊN!** Thắng **+${formatMoney(win)}**!`);
                 }
 
                 return message.reply({ embeds: [embed] });
@@ -687,37 +1025,23 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed], components: [row] });
         }
 
-        if (command === 'settaixiu' || command === 'setkenhtaixiu') {
-            const isBotAdmin = userId === ADMIN_ID;
-            const isGuildAdmin = message.member.permissions.has('Administrator');
-
-            if (!isBotAdmin && !isGuildAdmin) return message.reply('❌ Bạn không có quyền Administrator!');
-
-            const targetChannel = message.mentions.channels.first() || message.channel;
-            config[guildId] = targetChannel.id;
-            saveJSON(FILES.CONFIG, config);
-
-            await message.reply(`✅ Đã thiết lập kênh Tài Xỉu tại ${targetChannel}. Khởi chạy ngay...`);
-            startTaiXiuLoop(guildId, targetChannel.id);
-            return;
-        }
-
+        // LỆNH HƯỚNG DẪN
         if (command === 'hlp' || command === 'giupde') {
             const embed = new EmbedBuilder()
                 .setColor('Random')
-                .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH')
+                .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH BOT')
                 .addFields(
                     { name: '💼 Kinh tế', value: '`!profile`, `!sodu`, `!daily`, `!work`, `!trom`, `!chuyen`, `!top`', inline: false },
-                    { name: '🎲 Mini-Game', value: '• **Tài Xỉu:** Bấm nút trực tiếp trong kênh cược.\n• **Blackjack:** `!bj <tiền_cược>` hoặc `!blackjack <tiền_cược>`\n• **Nối Từ:** Nhập từ ghép trực tiếp trong kênh nối từ (Cộng +5.000đ/từ, 3 phút/lượt).', inline: false },
-                    { name: '👑 Admin Server', value: '`!settaixiu [#kênh]`, `!setnoitu [#kênh]`, `!noitu reset`', inline: false },
-                    { name: '👑 Admin Bot', value: '`!cong`, `!tru`, `!resetmoney`, `!settitle`, `!resettitle`', inline: false }
+                    { name: '🎲 Mini-Game', value: '• **Tài Xỉu:** Đặt trực tiếp qua nút bấm.\n• **Blackjack:** `!bj <tiền>`\n• **Nối Từ:** Nhập từ trong kênh game.\n• **Vé Số:** `!veso mua <6_chữ_số>`\n• **Lô Đề:** `!lode de/lo <2_chữ_số> <tiền>`\n• **KQXS:** `!ketqua`', inline: false },
+                    { name: '🛡️ Quản trị Staff & Admin', value: '`!cong @user <tiền>`, `!tru @user <tiền>`, `!settaixiu`, `!setnoitu`, `!setlode`, `!noitu reset`', inline: false },
+                    { name: '👑 Bot Owner (Chủ Bot)', value: '`!addstaff @user`, `!delstaff @user`, `!stafflist`, `!resetmoney`, `!settitle`, `!forcedraw`, `!exportdata`', inline: false }
                 )
-                .setFooter({ text: `Yêu cầu bởi ${message.author.username}`, iconURL: message.author.displayAvatarURL() })
                 .setTimestamp();
 
             return message.reply({ embeds: [embed] });
         }
 
+        // PROFILE & CÁC LỆNH KINH TẾ
         if (command === 'profile' || command === 'pf') {
             const targetUser = message.mentions.users.first() || message.author;
             const bal = getBalance(targetUser.id);
@@ -728,14 +1052,13 @@ client.on('messageCreate', async message => {
 
             let title = customTitles.get(targetUser.id);
             if (!title) {
-                if (bal >= 10000000) title = 'Tỷ phú sòng bạc 💎';
+                if (isBotOwner(targetUser.id)) title = '👑 Bot Owner / Admin Tối Cao 👑';
+                else if (isBotStaff(targetUser.id)) title = '🛡️ Ban Quản Trị / Staff 🛡️';
+                else if (bal >= 10000000) title = 'Tỷ phú sòng bạc 💎';
                 else if (bal >= 5000000) title = 'Đại gia khét tiếng 👑';
                 else if (bal >= 2000000) title = 'Tay chơi thứ thiệt 🔥';
                 else if (bal >= 500000) title = 'Dân chơi tiềm năng ✨';
                 else title = 'Người mới bắt đầu 🌱';
-            }
-            if (targetUser.id === ADMIN_ID && !customTitles.has(targetUser.id)) {
-                title = '👑 Chủ Tịch / Admin Tối Cao 👑';
             }
 
             const embed = new EmbedBuilder()
@@ -771,7 +1094,7 @@ client.on('messageCreate', async message => {
             setBalance(userId, newBal);
             dailyCooldown.set(userId, now);
 
-            return message.reply(`🎁 Nhận thành công **${formatMoney(bonus)}**! Số dư mới: **${formatMoney(newBal)}**.`);
+            return message.reply(`🎁 Nhận điểm danh **${formatMoney(bonus)}**! Số dư mới: **${formatMoney(newBal)}**.`);
         }
 
         if (command === 'work') {
@@ -796,7 +1119,7 @@ client.on('messageCreate', async message => {
             setBalance(userId, newBal);
             workCooldown.set(userId, now);
 
-            return message.reply(`💼 Bạn đi làm **${job.name}** và nhận **${formatMoney(job.pay)}**!`);
+            return message.reply(`💼 Bạn làm **${job.name}** và nhận được **${formatMoney(job.pay)}**!`);
         }
 
         if (command === 'trom' || command === 'crime') {
@@ -806,7 +1129,7 @@ client.on('messageCreate', async message => {
 
             if (now - lastCrime < cooldown) {
                 const minsLeft = Math.ceil((cooldown - (now - lastCrime)) / 60000);
-                return message.reply(`🚨 Cảnh sát đang tuần tra! Chờ **${minsLeft} phút** nữa.`);
+                return message.reply(`🚨 Cảnh sát đang trực! Quay lại sau **${minsLeft} phút**.`);
             }
 
             crimeCooldown.set(userId, now);
@@ -819,7 +1142,7 @@ client.on('messageCreate', async message => {
             } else {
                 const fine = Math.floor(Math.random() * 50000) + 10000;
                 setBalance(userId, bal - fine);
-                return message.reply(`👮 Bị phạt mất **${formatMoney(fine)}**!`);
+                return message.reply(`👮 Bị công an phạt mất **${formatMoney(fine)}**!`);
             }
         }
 
@@ -827,17 +1150,14 @@ client.on('messageCreate', async message => {
             const targetUser = message.mentions.users.first();
             const amount = parseInt(args[1], 10);
 
-            if (!targetUser || isNaN(amount) || amount <= 0) {
-                return message.reply('❌ Cú pháp: `!chuyen @user <số_tiền>`');
-            }
-            if (targetUser.id === userId) return message.reply('❌ Không thể tự chuyển tiền cho chính mình!');
+            if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('❌ Cú pháp: `!chuyen @user <số_tiền>`');
+            if (targetUser.id === userId) return message.reply('❌ Không thể tự chuyển cho chính mình!');
 
             const senderBal = getBalance(userId);
-            if (senderBal < amount) return message.reply(`❌ Số dư không đủ! Số dư: **${formatMoney(senderBal)}**.`);
+            if (senderBal < amount) return message.reply(`❌ Số dư không đủ! Hiện có: **${formatMoney(senderBal)}**.`);
 
-            const receiverBal = getBalance(targetUser.id);
             setBalance(userId, senderBal - amount);
-            setBalance(targetUser.id, receiverBal + amount);
+            setBalance(targetUser.id, getBalance(targetUser.id) + amount);
 
             return message.reply(`💸 Đã chuyển **${formatMoney(amount)}** cho ${targetUser}!`);
         }
@@ -857,45 +1177,6 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed] });
         }
 
-        if (['cong', 'tru', 'resetmoney'].includes(command)) {
-            if (userId !== ADMIN_ID) return message.reply('❌ Quyền hạn không đủ!');
-            const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Hãy tag thành viên!');
-
-            if (command === 'resetmoney') {
-                setBalance(targetUser.id, 50000);
-                return message.reply(`🔄 Đã reset ví của ${targetUser} về **50.000đ**.`);
-            }
-
-            const amount = parseInt(args[1], 10);
-            if (isNaN(amount)) return message.reply('❌ Số tiền không hợp lệ!');
-
-            let bal = getBalance(targetUser.id);
-            bal = command === 'cong' ? bal + amount : bal - amount;
-            setBalance(targetUser.id, bal);
-
-            return message.reply(`✅ Cập nhật ví của ${targetUser}. Số dư mới: **${formatMoney(bal)}**.`);
-        }
-
-        if (command === 'settitle' || command === 'resettitle') {
-            if (userId !== ADMIN_ID) return message.reply('❌ Quyền hạn không đủ!');
-            const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Hãy tag thành viên!');
-
-            if (command === 'resettitle') {
-                customTitles.delete(targetUser.id);
-                saveJSON(FILES.TITLES, customTitles);
-                return message.reply(`🔄 Đã xóa danh hiệu tùy chỉnh của ${targetUser}.`);
-            }
-
-            const newTitle = args.slice(1).join(' ');
-            if (!newTitle) return message.reply('❌ Vui lòng nhập tên danh hiệu!');
-
-            customTitles.set(targetUser.id, newTitle);
-            saveJSON(FILES.TITLES, customTitles);
-
-            return message.reply(`✨ Đã đặt danh hiệu cho ${targetUser}: **${newTitle}**`);
-        }
     } catch (err) {
         console.error('[Message Error]:', err);
     }
