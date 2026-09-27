@@ -4,6 +4,7 @@ const {
 } = require('discord.js');
 const fs = require('fs');
 const express = require('express');
+const vietnameseDictionary = require('vietnamese-dictionary');
 
 // ==========================================
 // 1. TẠO WEB SERVER GIỮ BOT SỐNG TRÊN RENDER
@@ -71,16 +72,16 @@ const saveJSON = (file, data) => {
 const balances = loadJSON(FILES.BALANCES);
 const customTitles = loadJSON(FILES.TITLES);
 const config = loadJSON(FILES.CONFIG, false);
-const wordConfig = loadJSON(FILES.WORD_CONFIG, false); // Lưu kênh Nối Từ
+const wordConfig = loadJSON(FILES.WORD_CONFIG, false);
 
 const dailyCooldown = new Map();
 const workCooldown = new Map();
 const crimeCooldown = new Map();
 const guildSessions = new Map();
 const bjGames = new Map();
-const wordGameSessions = new Map(); // Quản lý game Nối từ [guildId => data]
+const wordGameSessions = new Map(); // Quản lý ván nối từ
 
-// START WORDS LIST FOR WORD GAME
+// DANH SÁCH TỪ BẮT ĐẦU VÁN MỚI
 const START_WORDS = ['phát triển', 'học tập', 'máy tính', 'yêu thương', 'thành công', 'gia đình', 'hy vọng', 'tương lai', 'thành phố', 'văn hóa'];
 
 const getWordSession = (guildId) => {
@@ -89,10 +90,27 @@ const getWordSession = (guildId) => {
         wordGameSessions.set(guildId, {
             currentWord: randomWord,
             lastUserId: null,
-            usedWords: new Set([randomWord])
+            usedWords: new Set([randomWord]),
+            timeoutId: null
         });
     }
     return wordGameSessions.get(guildId);
+};
+
+// ĐẶT LẠI THỜI GIAN CHỜ 3 PHÚT CHO TRÒ NỐI TỪ
+const startWordGameTimeout = (guildId, channel) => {
+    const session = getWordSession(guildId);
+    if (session.timeoutId) clearTimeout(session.timeoutId);
+
+    session.timeoutId = setTimeout(async () => {
+        const newWord = START_WORDS[Math.floor(Math.random() * START_WORDS.length)];
+        session.currentWord = newWord;
+        session.lastUserId = null;
+        session.usedWords = new Set([newWord]);
+        session.timeoutId = null;
+
+        await channel.send(`⏳ **Đã quá 3 phút không có ai nối từ!** Ván cũ kết thúc.\n🔄 **Bắt đầu ván mới với từ:** **"${newWord}"**`).catch(() => {});
+    }, 180000); // 3 phút = 180.000 ms
 };
 
 // HELPER FUNCTIONS
@@ -473,19 +491,24 @@ client.on('messageCreate', async message => {
     const userId = message.author.id;
 
     // ==========================================
-    // 3. GAME NỐI TỪ TIẾNG VIỆT
+    // 3. GAME NỐI TỪ TIẾNG VIỆT (TỰ ĐỘNG + TỪ ĐIỂN + TIMEOUT 3P)
     // ==========================================
     if (wordConfig[guildId] && message.channel.id === wordConfig[guildId]) {
         if (message.content.startsWith(PREFIX)) {
             const args = message.content.slice(PREFIX.length).trim().split(/ +/);
             const cmd = args.shift().toLowerCase();
             if (cmd === 'noitu' && args[0] === 'reset') {
+                const session = getWordSession(guildId);
+                if (session.timeoutId) clearTimeout(session.timeoutId);
+                
                 const newWord = START_WORDS[Math.floor(Math.random() * START_WORDS.length)];
                 wordGameSessions.set(guildId, {
                     currentWord: newWord,
                     lastUserId: null,
-                    usedWords: new Set([newWord])
+                    usedWords: new Set([newWord]),
+                    timeoutId: null
                 });
+                startWordGameTimeout(guildId, message.channel);
                 return message.reply(`🔄 Đã reset trò chơi nối từ! Từ bắt đầu mới: **"${newWord}"**`);
             }
         }
@@ -493,7 +516,7 @@ client.on('messageCreate', async message => {
         const inputWord = message.content.trim().toLowerCase();
         const wordParts = inputWord.split(/\s+/);
 
-        // Kiểm tra từ ghép đúng 2 tiếng
+        // 1. Kiểm tra từ ghép đúng 2 tiếng
         if (wordParts.length !== 2) {
             return message.react('❌');
         }
@@ -502,33 +525,44 @@ client.on('messageCreate', async message => {
         const lastWordParts = wordSession.currentWord.split(/\s+/);
         const requiredStartWord = lastWordParts[lastWordParts.length - 1]; // Tiếng cuối từ trước
 
-        // Không cho phép 1 người tự nối từ của chính mình
+        // 2. Không cho phép 1 người tự nối từ của chính mình
         if (wordSession.lastUserId === userId) {
             await message.reply('⚠️ Lượt vừa rồi là của bạn! Hãy đợi người khác nối tiếp.');
             return message.react('❌');
         }
 
-        // Kiểm tra từ có nối đúng tiếng không
+        // 3. Kiểm tra từ có nối đúng tiếng không
         if (wordParts[0] !== requiredStartWord) {
             await message.reply(`❌ Từ của bạn phải bắt đầu bằng chữ **"${requiredStartWord}"**! Từ hiện tại: **"${wordSession.currentWord}"**`);
             return message.react('❌');
         }
 
-        // Kiểm tra xem từ đã từng dùng chưa
+        // 4. Kiểm tra từ có tồn tại trong từ điển Tiếng Việt không
+        const isValidVietnamese = vietnameseDictionary.has(inputWord);
+        if (!isValidVietnamese) {
+            await message.reply(`❌ Từ **"${inputWord}"** không tồn tại trong từ điển Tiếng Việt!`);
+            return message.react('❌');
+        }
+
+        // 5. Kiểm tra xem từ đã từng dùng chưa
         if (wordSession.usedWords.has(inputWord)) {
             await message.reply(`❌ Từ **"${inputWord}"** đã được sử dụng trước đó rồi!`);
             return message.react('❌');
         }
 
-        // Nối từ thành công
+        // Nối từ thành công!
         wordSession.currentWord = inputWord;
         wordSession.lastUserId = userId;
         wordSession.usedWords.add(inputWord);
 
+        // Cộng thưởng
         const reward = 5000;
         setBalance(userId, getBalance(userId) + reward);
 
         await message.react('✅');
+
+        // Khởi động lại đếm ngược 3 phút
+        startWordGameTimeout(guildId, message.channel);
         return;
     }
 
@@ -550,7 +584,9 @@ client.on('messageCreate', async message => {
             saveJSON(FILES.WORD_CONFIG, wordConfig);
 
             const session = getWordSession(guildId);
-            return message.reply(`✅ Đã thiết lập kênh Nối Từ tại ${targetChannel}.\n🔤 Từ khởi đầu hiện tại: **"${session.currentWord}"**`);
+            startWordGameTimeout(guildId, targetChannel);
+
+            return message.reply(`✅ Đã thiết lập kênh Nối Từ tại ${targetChannel}.\n🔤 Từ khởi đầu hiện tại: **"${session.currentWord}"**\n⏱️ Mỗi lượt chơi có thời gian chờ là **3 phút**.`);
         }
 
         if (command === 'blackjack' || command === 'bj') {
@@ -647,7 +683,7 @@ client.on('messageCreate', async message => {
                 .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH')
                 .addFields(
                     { name: '💼 Kinh tế', value: '`!profile`, `!sodu`, `!daily`, `!work`, `!trom`, `!chuyen`, `!top`', inline: false },
-                    { name: '🎲 Mini-Game', value: '• **Tài Xỉu:** Bấm nút trực tiếp trong kênh cược.\n• **Blackjack:** `!bj <tiền_cược>` hoặc `!blackjack <tiền_cược>`\n• **Nối Từ:** Nhập từ ghép trực tiếp vào kênh nối từ (Cộng +5.000đ/từ).', inline: false },
+                    { name: '🎲 Mini-Game', value: '• **Tài Xỉu:** Bấm nút trực tiếp trong kênh cược.\n• **Blackjack:** `!bj <tiền_cược>` hoặc `!blackjack <tiền_cược>`\n• **Nối Từ:** Nhập từ ghép trực tiếp trong kênh nối từ (Cộng +5.000đ/từ, 3 phút/lượt).', inline: false },
                     { name: '👑 Admin Server', value: '`!settaixiu [#kênh]`, `!setnoitu [#kênh]`, `!noitu reset`', inline: false },
                     { name: '👑 Admin Bot', value: '`!cong`, `!tru`, `!resetmoney`, `!settitle`, `!resettitle`', inline: false }
                 )
