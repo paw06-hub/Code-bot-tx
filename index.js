@@ -96,6 +96,9 @@ if (!cryptoMarket.coins) {
     saveJSONSync(FILES.CRYPTO, cryptoMarket);
 }
 
+// Lưu trữ ID tin nhắn thông báo thị trường cũ theo từng Guild để tự động xóa
+const cryptoAnnounceMessages = new Map();
+
 const dailyCooldown = new Map();
 const workCooldown = new Map();
 const crimeCooldown = new Map();
@@ -186,6 +189,47 @@ const getCryptoChartUrl = (symbol, coin) => {
     return `https://quickchart.io/chart?w=500&h=250&bkg=#2f3136&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
 };
 
+async function broadcastCryptoUpdate() {
+    let marketText = '';
+    for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
+        const trendEmoji = coin.change > 0 ? '🟢 ▲' : (coin.change < 0 ? '🔴 ▼' : '🟡 ➖');
+        const sign = coin.change > 0 ? '+' : '';
+        marketText += `${trendEmoji} **${coin.name} (${symbol})**: **${formatMoney(coin.price)}** (${sign}${coin.change}%)\n`;
+    }
+
+    const embedMarket = new EmbedBuilder()
+        .setColor('Blurple')
+        .setTitle('📊 BẢN TIN THỊ TRƯỜNG COIN & CHỨNG KHOÁN (TỰ ĐỘNG)')
+        .setDescription(`*Giá thị trường vừa được cập nhật! Tự động làm mới sau mỗi 2 phút.*\n\n${marketText}`)
+        .addFields(
+            { name: '📈 Xem biểu đồ', value: '`!coin chart <MÃ_COIN>`', inline: true },
+            { name: '🛒 Mua coin', value: '`!coin mua <MÃ_COIN> <SL>`', inline: true },
+            { name: '💰 Bán coin', value: '`!coin ban <MÃ_COIN> <SL>`', inline: true }
+        )
+        .setTimestamp();
+
+    // Duyệt qua tất cả Server để tìm kênh Crypto đã cấu hình
+    for (const [guildId, guildData] of Object.entries(config)) {
+        if (typeof guildData === 'object' && guildData.cryptoChannelId) {
+            const channel = await client.channels.fetch(guildData.cryptoChannelId).catch(() => null);
+            if (channel) {
+                // Xóa tin nhắn cũ nếu có
+                const oldMsgId = cryptoAnnounceMessages.get(guildId);
+                if (oldMsgId) {
+                    const oldMsg = await channel.messages.fetch(oldMsgId).catch(() => null);
+                    if (oldMsg) await oldMsg.delete().catch(() => {});
+                }
+
+                // Gửi tin nhắn mới và lưu ID
+                const newMsg = await channel.send({ embeds: [embedMarket] }).catch(() => null);
+                if (newMsg) {
+                    cryptoAnnounceMessages.set(guildId, newMsg.id);
+                }
+            }
+        }
+    }
+}
+
 function updateCryptoPrices() {
     for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
         const percentChange = (Math.random() * 0.30) - 0.15;
@@ -199,10 +243,13 @@ function updateCryptoPrices() {
     }
     saveJSONSync(FILES.CRYPTO, cryptoMarket);
     console.log('📈 [Crypto Engine] Đã cập nhật giá thị trường coin!');
+
+    // Gửi thông báo đến các kênh đã đăng ký
+    broadcastCryptoUpdate();
 }
 
 function scheduleCryptoMarket() {
-    // Đã cập nhật thời gian làm mới giá từ 10 phút (600000ms) xuống 2 phút (120000ms)
+    // Thời gian làm mới giá và phát thông báo là 2 phút (120000ms)
     setInterval(updateCryptoPrices, 120000);
 }
 
@@ -265,11 +312,13 @@ const getSession = (guildId) => {
 };
 
 const saveTaiXiuState = (guildId, session) => {
-    config[guildId] = {
-        channelId: session.channelId,
-        sessionNumber: session.sessionNumber,
-        history: session.history
-    };
+    if (typeof config[guildId] !== 'object') {
+        config[guildId] = {};
+    }
+    config[guildId].channelId = session.channelId;
+    config[guildId].sessionNumber = session.sessionNumber;
+    config[guildId].history = session.history;
+
     saveJSONSync(FILES.CONFIG, config);
 };
 
@@ -921,7 +970,7 @@ client.on('messageCreate', async message => {
 
             const embedMarket = new EmbedBuilder()
                 .setColor('Blurple')
-                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ẢO')
+                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO')
                 .setDescription(`*Thị trường tự động cập nhật giá sau mỗi 2 phút.*\n\n${marketText}`)
                 .addFields(
                     { name: '📈 Xem biểu đồ', value: '`!coin chart <MÃ_COIN>`', inline: true },
@@ -931,6 +980,18 @@ client.on('messageCreate', async message => {
                 .setFooter({ text: 'Gợi ý: Dùng !coin chart BTC để xem trực quan biểu đồ giá!' });
 
             return message.reply({ embeds: [embedMarket] });
+        }
+
+        // LỆNH SETUP KÊNH TỰ ĐỘNG THÔNG BÁO COIN
+        if (command === 'setcoin') {
+            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('❌ Bạn không có quyền cấu hình kênh!');
+            const targetChannel = message.mentions.channels.first() || message.channel;
+
+            if (typeof config[guildId] !== 'object') config[guildId] = {};
+            config[guildId].cryptoChannelId = targetChannel.id;
+            saveJSONSync(FILES.CONFIG, config);
+
+            return message.reply(`✅ Đã thiết lập kênh thông báo biến động Crypto/Chứng khoán tự động tại ${targetChannel}.\n*(Tin nhắn cũ sẽ tự động bị xóa khi biến động giá mới!)*`);
         }
 
         // 🏦 HỆ THỐNG VAY TIỀN & TRẢ NỢ - LÃI SUẤT 30%
@@ -1326,7 +1387,8 @@ client.on('messageCreate', async message => {
                         name: '⚙️ Cấu Hình Kênh (Staff/Admin)', 
                         value: '• `!settaixiu`: Cài đặt kênh tự động mở game Tài Xỉu\n' +
                                '• `!setlode`: Cài đặt kênh thông báo kết quả Lô Đề\n' +
-                               '• `!setnoitu`: Cài đặt kênh chơi game Nối Từ', 
+                               '• `!setnoitu`: Cài đặt kênh chơi game Nối Từ\n' +
+                               '• `!setcoin`: Cài đặt kênh tự động thông báo giá Coin (tự xóa tin cũ)', 
                         inline: false 
                     },
                     { 
