@@ -144,11 +144,9 @@ const setBalance = (userId, amount) => {
     saveJSONSync(FILES.BALANCES, balances);
 };
 
-// ==========================================
-// CẤU HÌNH VAY NGÂN HÀNG (ĐÃ CẬP NHẬT 1 TỶ)
-// ==========================================
+// CẤU HÌNH VAY NGÂN HÀNG (1 TỶ)
 const LOAN_INTEREST_RATE = 0.30;
-const MAX_LOAN_LIMIT = 1000000000; // Đã cập nhật hạn mức vay lên 1.000.000.000đ (1 Tỷ)
+const MAX_LOAN_LIMIT = 1000000000;
 
 const getLoan = (userId) => loans.get(userId) || 0;
 const setLoan = (userId, amount) => {
@@ -371,7 +369,6 @@ function generateLotteryResults() {
     return { specialPrize, loResults };
 }
 
-// XỬ LÝ QUAY XỔ SỐ & LÔ ĐỀ
 async function processLotteryDraw(isManual = false) {
     const result = generateLotteryResults();
     lotteryData.lastResult = result;
@@ -437,7 +434,6 @@ async function processLotteryDraw(isManual = false) {
     return { sentCount, result };
 }
 
-// TỰ ĐỘNG HẸN GIỜ QUAY THEO MÚI GIỜ VN (18:00)
 function scheduleDailyLottery() {
     let hasDrawnToday = false;
 
@@ -982,6 +978,60 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
+        // ==========================================
+        // CÁC LỆNH ĐẶT CƯỢC LÔ ĐỀ & VÉ SỐ
+        // ==========================================
+        if (command === 'lo' || command === 'de') {
+            const num = args[0];
+            const bet = parseInt(args[1], 10);
+
+            if (!num || !/^\d{2}$/.exec(num) || isNaN(bet) || bet <= 0) {
+                return message.reply(`❌ Cú pháp: \`!${command} <số_2_chữ_số> <tiền_cược>\`\n*(VD: \`!${command} 68 50000\`)*`);
+            }
+
+            const bal = getBalance(userId);
+            if (bet > bal) {
+                return message.reply(`❌ Số dư ví không đủ! Bạn hiện có **${formatMoney(bal)}**.`);
+            }
+
+            setBalance(userId, bal - bet);
+            lotteryData.lodeBets.push({
+                userId: userId,
+                type: command,
+                number: num,
+                amount: bet
+            });
+            saveJSONSync(FILES.LOTTERY, lotteryData);
+
+            const rateText = command === 'de' ? '1 ăn 70 (Giải Đặc Biệt)' : '1 ăn 3.5 mỗi nháy (27 giải)';
+            return message.reply(`✅ Đã đặt cược **${command.toUpperCase()} ${num}** với số tiền **${formatMoney(bet)}**! Tỉ lệ: **${rateText}**. Đợi kết quả lúc 18:00!`);
+        }
+
+        if (command === 'veso' || command === 'muaveso') {
+            const TICKET_PRICE = 10000;
+            let num = args[0];
+
+            if (!num) {
+                num = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+            } else if (!/^\d{6}$/.exec(num)) {
+                return message.reply('❌ Vé số phải có đủ **6 chữ số** (VD: `!veso 123456` hoặc gõ `!veso` để mua ngẫu nhiên).');
+            }
+
+            const bal = getBalance(userId);
+            if (bal < TICKET_PRICE) {
+                return message.reply(`❌ Bạn cần ít nhất **${formatMoney(TICKET_PRICE)}** để mua vé số!`);
+            }
+
+            setBalance(userId, bal - TICKET_PRICE);
+            lotteryData.tickets.push({
+                userId: userId,
+                number: num
+            });
+            saveJSONSync(FILES.LOTTERY, lotteryData);
+
+            return message.reply(`🎫 Đã mua thành công vé số **${num}** với giá **${formatMoney(TICKET_PRICE)}**! Trúng Giải Đặc Biệt nhận ngay **100.000.000đ**!`);
+        }
+
         // LỆNH ÉP BOT RA KẾT QUẢ SỔ XỐ / LÔ ĐỀ NGAY
         if (['kqsx', 'quayso', 'eplode'].includes(command)) {
             if (!isBotStaff(userId)) return message.reply('❌ Bạn không có quyền ép quay số!');
@@ -1371,8 +1421,8 @@ client.on('messageCreate', async message => {
                         inline: false 
                     },
                     { 
-                        name: '🎲 Game Giải Trí & Cờ Bạc', 
-                        value: '• `!bj <số_tiền>` (hoặc `!blackjack`): Chơi bài Blackjack (Xì Dách)\n• **Tài Xỉu:** Tham gia cược qua các nút bấm tương tác tại kênh Tài Xỉu\n• **Nối Từ:** Tham gia trực tiếp bằng cách gõ từ ghép 2 tiếng tại kênh Nối Từ (`!noitu reset` để làm mới từ)\n• **Lô Đề / Vé Số:** Tự động quay thưởng vào 18:00 hằng ngày', 
+                        name: '🎲 Game Giải Trí & Lô Đề', 
+                        value: '• `!lo <số_2_chữ_số> <số_tiền>`: Đánh Lô (1 ăn 3.5 mỗi nháy trong 27 giải)\n• `!de <số_2_chữ_số> <số_tiền>`: Đánh Đề (1 ăn 70 Giải Đặc Biệt)\n• `!veso [chữ_số]` (hoặc `!muaveso`): Mua vé số 6 chữ số giá 10.000đ (Trúng 100Tr)\n• `!bj <số_tiền>` (hoặc `!blackjack`): Chơi bài Blackjack (Xì Dách)\n• **Tài Xỉu:** Tham gia cược qua các nút bấm tương tác tại kênh Tài Xỉu\n• **Nối Từ:** Tham gia trực tiếp bằng cách gõ từ ghép 2 tiếng tại kênh Nối Từ (`!noitu reset` để làm mới từ)\n• **Lô Đề / Vé Số:** Tự động quay thưởng vào 18:00 hằng ngày', 
                         inline: false 
                     },
                     { 
