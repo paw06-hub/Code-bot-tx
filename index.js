@@ -45,7 +45,7 @@ const FILES = {
     LODE_CONFIG: './lode_config.json', 
     LOTTERY: './lottery.json',         
     STAFFS: './staffs.json',           
-    ADMINS: './admins.json',           // Thêm file quản lý Admin phụ
+    ADMINS: './admins.json',           
     LOANS: './loans.json',             
     CRYPTO: './crypto.json',           
     PORTFOLIO: './portfolio.json'      
@@ -79,7 +79,7 @@ let wordConfig = loadJSON(FILES.WORD_CONFIG, false);
 let lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
 let lotteryData = loadJSON(FILES.LOTTERY, false);
 let staffList = loadJSON(FILES.STAFFS, false);
-let adminList = loadJSON(FILES.ADMINS, false); // Tải danh sách Admin phụ
+let adminList = loadJSON(FILES.ADMINS, false);
 let loans = loadJSON(FILES.LOANS);
 let cryptoMarket = loadJSON(FILES.CRYPTO, false);
 let portfolios = loadJSON(FILES.PORTFOLIO);
@@ -88,7 +88,7 @@ if (!lotteryData.tickets) lotteryData.tickets = [];
 if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
 if (!lotteryData.lastResult) lotteryData.lastResult = null;
 if (!Array.isArray(staffList.users)) staffList.users = [];
-if (!Array.isArray(adminList.users)) adminList.users = []; // Khởi tạo mảng Admin phụ nếu chưa có
+if (!Array.isArray(adminList.users)) adminList.users = [];
 
 if (!cryptoMarket.coins) {
     cryptoMarket.coins = {
@@ -106,7 +106,6 @@ const bjGames = new Map();
 const wordGameSessions = new Map();
 const dictionaryCache = new Map();
 
-// Cập nhật hàm kiểm tra Owner/Admin: Bao gồm Admin chính và các Admin phụ được thêm vào danh sách
 const isBotOwner = (userId) => userId === ADMIN_ID || adminList.users.includes(userId);
 const isBotStaff = (userId) => isBotOwner(userId) || staffList.users.includes(userId);
 
@@ -145,8 +144,11 @@ const setBalance = (userId, amount) => {
     saveJSONSync(FILES.BALANCES, balances);
 };
 
+// ==========================================
+// CẤU HÌNH VAY NGÂN HÀNG (ĐÃ CẬP NHẬT 1 TỶ)
+// ==========================================
 const LOAN_INTEREST_RATE = 0.30;
-const MAX_LOAN_LIMIT = 5000000;
+const MAX_LOAN_LIMIT = 1000000000; // Đã cập nhật hạn mức vay lên 1.000.000.000đ (1 Tỷ)
 
 const getLoan = (userId) => loans.get(userId) || 0;
 const setLoan = (userId, amount) => {
@@ -369,7 +371,8 @@ function generateLotteryResults() {
     return { specialPrize, loResults };
 }
 
-async function processLotteryDraw() {
+// XỬ LÝ QUAY XỔ SỐ & LÔ ĐỀ
+async function processLotteryDraw(isManual = false) {
     const result = generateLotteryResults();
     lotteryData.lastResult = result;
     const specialDe = result.specialPrize.slice(-2);
@@ -405,9 +408,12 @@ async function processLotteryDraw() {
     lotteryData.lodeBets = [];
     saveJSONSync(FILES.LOTTERY, lotteryData);
 
+    const titleText = isManual ? '🎰 KẾT QUẢ XỔ SỐ & LÔ ĐỀ (QUAY THỦ CÔNG)' : '🎰 KẾT QUẢ XỔ SỐ & LÔ ĐỀ HÔM NAY (18:00)';
+    const headerMsg = isManual ? '⚡ **THÔNG BÁO: QUAY THƯỞNG XỔ SỐ THEO YÊU CẦU AD!**' : '🔔 **ĐÃ ĐẾN GIỜ QUAY THƯỞNG XỔ SỐ THƯỜNG NIÊN (18:00)!**';
+
     const embed = new EmbedBuilder()
         .setColor('Red')
-        .setTitle('🎰 KẾT QUẢ XỔ SỐ & LÔ ĐỀ HÔM NAY (18:00)')
+        .setTitle(titleText)
         .addFields(
             { name: '🏆 Giải Đặc Biệt (Vé Số)', value: `🎉 **${result.specialPrize}**`, inline: false },
             { name: '🎯 Số Đề (2 số cuối GĐB)', value: `🔥 **${specialDe}**`, inline: true },
@@ -417,24 +423,40 @@ async function processLotteryDraw() {
         )
         .setTimestamp();
 
+    let sentCount = 0;
     for (const [guildId, channelId] of Object.entries(lodeConfig)) {
         if (channelId) {
             const channel = await client.channels.fetch(channelId).catch(() => null);
             if (channel) {
-                channel.send({ content: '🔔 **ĐÃ ĐẾN GIỜ QUAY THƯỞNG XỔ SỐ THƯỜNG NIÊN (18:00)!**', embeds: [embed] }).catch(() => {});
+                await channel.send({ content: headerMsg, embeds: [embed] }).catch(() => {});
+                sentCount++;
             }
         }
     }
+
+    return { sentCount, result };
 }
 
+// TỰ ĐỘNG HẸN GIỜ QUAY THEO MÚI GIỜ VN (18:00)
 function scheduleDailyLottery() {
-    const checkTime = () => {
-        const now = new Date();
-        if (now.getHours() === 18 && now.getMinutes() === 0) {
-            processLotteryDraw();
+    let hasDrawnToday = false;
+
+    setInterval(() => {
+        const vnDateStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" });
+        const vnDate = new Date(vnDateStr);
+        
+        const hours = vnDate.getHours();
+        const minutes = vnDate.getMinutes();
+
+        if (hours === 18 && minutes === 0) {
+            if (!hasDrawnToday) {
+                hasDrawnToday = true;
+                processLotteryDraw(false);
+            }
+        } else {
+            hasDrawnToday = false; 
         }
-    };
-    setInterval(checkTime, 60000);
+    }, 10000);
 }
 
 const SUITS = ['♠️', '♥️', '♦️', '♣️'];
@@ -960,7 +982,19 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // --- LỆNH IMPORT NHIỀU FILE DỮ LIỆU CÙNG LÚC ---
+        // LỆNH ÉP BOT RA KẾT QUẢ SỔ XỐ / LÔ ĐỀ NGAY
+        if (['kqsx', 'quayso', 'eplode'].includes(command)) {
+            if (!isBotStaff(userId)) return message.reply('❌ Bạn không có quyền ép quay số!');
+            
+            await message.reply('🎲 **Đang tiến hành quay số KQSX & Lô Đề ngay lập tức...**');
+            const resData = await processLotteryDraw(true);
+            
+            if (resData.sentCount === 0) {
+                return message.channel.send('⚠️ Đã quay xong kết quả nhưng chưa có kênh nào được cài đặt bằng lệnh `!setlode`!');
+            }
+            return;
+        }
+
         if (command === 'importdata') {
             if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền import dữ liệu!');
             
@@ -981,7 +1015,6 @@ client.on('messageCreate', async message => {
                         const targetPath = FILES[matchedKey];
                         const response = await axios.get(att.url, { responseType: 'text' });
                         
-                        // Kiểm tra tính hợp lệ của JSON trước khi ghi đè
                         JSON.parse(response.data); 
                         fs.writeFileSync(targetPath, response.data, 'utf8');
                         successCount++;
@@ -994,7 +1027,6 @@ client.on('messageCreate', async message => {
                 }
             }
 
-            // Tải lại toàn bộ dữ liệu vào RAM ngay lập tức
             balances = loadJSON(FILES.BALANCES);
             customTitles = loadJSON(FILES.TITLES);
             config = loadJSON(FILES.CONFIG, false);
@@ -1015,7 +1047,6 @@ client.on('messageCreate', async message => {
             return message.reply(replyMessage);
         }
 
-        // --- LỆNH QUẢN LÝ ADMIN PHỤ ---
         if (command === 'addadmin') {
             if (userId !== ADMIN_ID) return message.reply('❌ Chỉ Owner gốc mới có quyền thêm Admin phụ!');
             const targetUser = message.mentions.users.first();
@@ -1066,7 +1097,6 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed] });
         }
 
-        // --- LỆNH QUẢN LÝ STAFF ---
         if (command === 'addstaff') {
             if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền thêm Staff!');
             const targetUser = message.mentions.users.first();
@@ -1190,6 +1220,7 @@ client.on('messageCreate', async message => {
             return message.reply(`✅ Đã thiết lập kênh thông báo biến động Crypto tự động tại ${targetChannel}.`);
         }
 
+        // LỆNH VAY TIỀN NGÂN HÀNG (SỬ DỤNG HẠN MỨC 1 TỶ)
         if (command === 'vay' || command === 'vaytien') {
             const amount = parseInt(args[0], 10);
             const currentDebt = getLoan(userId);
@@ -1331,7 +1362,7 @@ client.on('messageCreate', async message => {
                 .addFields(
                     { 
                         name: '💰 Tài Chính & Ngân Hàng', 
-                        value: '• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại\n• `!profile` (hoặc `!pf`): Xem hồ sơ chi tiết, BXH và danh hiệu\n• `!daily`: Điểm danh nhận quà hằng ngày (100.000đ)\n• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia\n• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%)\n• `!trano <số_tiền|all>`: Trả nợ ngân hàng', 
+                        value: '• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại\n• `!profile` (hoặc `!pf`): Xem hồ sơ chi tiết, BXH và danh hiệu\n• `!daily`: Điểm danh nhận quà hằng ngày (100.000đ)\n• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia\n• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%, tối đa 1 Tỷ)\n• `!trano <số_tiền|all>`: Trả nợ ngân hàng', 
                         inline: false 
                     },
                     { 
@@ -1346,7 +1377,7 @@ client.on('messageCreate', async message => {
                     },
                     { 
                         name: '⚙️ Lệnh Quản Trị & Cấu Hình (Admin / Staff)', 
-                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!addadmin @user`: Thêm Admin phụ tối cao (Chỉ Owner gốc)\n• `!removeadmin @user`: Gỡ Admin phụ (Chỉ Owner gốc)\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff\n• `!removestaff @user`: Xóa quản trị viên Staff\n• `!liststaff`: Xem danh sách Staff\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
+                        value: '• `!kqsx` (hoặc `!quayso`): Ép bot ra kết quả Xổ Số & Lô Đề ngay lập tức\n• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!addadmin @user`: Thêm Admin phụ tối cao (Chỉ Owner gốc)\n• `!removeadmin @user`: Gỡ Admin phụ (Chỉ Owner gốc)\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff\n• `!removestaff @user`: Xóa quản trị viên Staff\n• `!liststaff`: Xem danh sách Staff\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
                         inline: false 
                     }
                 )
