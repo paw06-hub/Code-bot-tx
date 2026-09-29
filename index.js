@@ -997,28 +997,28 @@ async function finishBlackjackGame(interaction, gameKey, game) {
         setBalance(user.id, currentBal + winAmount);
     } else if (dealerScore > 21) {
         winAmount = bet;
-        resultMessage = `🎉 **Nhà cái QUẮC (${dealerScore} điểm)!** Bạn thắng **+${formatMoney(winAmount)}**.`;
+        resultMessage = `<a:Danker_dance:1554625991131926548> **@Paw162 QUẮC (${dealerScore} điểm)!** Bạn thắng **+${formatMoney(winAmount)}**.`;
         setBalance(user.id, currentBal + winAmount);
     } else if (playerScore > dealerScore) {
         winAmount = bet;
-        resultMessage = `🎉 **Thắng trận!** (${playerScore} vs ${dealerScore}). Nhận **+${formatMoney(winAmount)}**.`;
+        resultMessage = `<:emoji_112:1554625557583495218> **Thắng trận!** (${playerScore} vs ${dealerScore}). Nhận **+${formatMoney(winAmount)}**.`;
         setBalance(user.id, currentBal + winAmount);
     } else if (playerScore < dealerScore) {
-        resultMessage = `😭 **Nhà cái thắng!** (${dealerScore} vs ${playerScore}). Mất **-${formatMoney(bet)}**.`;
+        resultMessage = `<:emoji_4:1554625281686249507> **@Paw162 thắng!** (${dealerScore} vs ${playerScore}). Mất **-${formatMoney(bet)}**.`;
         setBalance(user.id, currentBal - bet);
     } else {
-        resultMessage = `🤝 **HÒA!** Bằng điểm (${playerScore}). Hoàn lại tiền.`;
+        resultMessage = `<a:3712partneranimated:1554624999132893299> **HÒA!** Bằng điểm (${playerScore}). Hoàn lại tiền.`;
     }
 
     bjGames.delete(gameKey);
 
     const embed = new EmbedBuilder()
         .setColor(winAmount > 0 ? 'Green' : (resultMessage.includes('HÒA') ? 'Yellow' : 'Red'))
-        .setTitle(`🃏 KẾT QUẢ BLACKJACK - ${user.username}`)
+        .setTitle(`<:Notification:1554624690729783296> KẾT QUẢ BLACKJACK <a:loading:1554624602142015539> - ${user.username}`)
         .setDescription(resultMessage)
         .addFields(
-            { name: '🤖 Nhà Cái', value: `${formatHand(dealerHand)} (${dealerScore} điểm)` },
-            { name: '👤 Bạn', value: `${formatHand(playerHand)} (${playerScore} điểm)` }
+            { name: '<a:vuongmiendo:1554622871882436710> @Paw162', value: `${formatHand(dealerHand)} (${dealerScore} điểm)` },
+            { name: '<:Members:1554622922629451828> Bạn', value: `${formatHand(playerHand)} (${playerScore} điểm)` }
         )
         .setFooter({ text: `Ví hiện tại: ${formatMoney(getBalance(user.id))}` });
 
@@ -1047,7 +1047,7 @@ client.on('messageCreate', async message => {
                     timeoutId: null
                 });
                 startWordGameTimeout(guildId, message.channel);
-                return message.reply(`🔄 Đã reset game Nối Từ! Từ bắt đầu: **"${newWord}"**`);
+                return message.reply(`<a:aawarn:1554622466297565267> Đã reset game Nối Từ! Từ bắt đầu: **"${newWord}"**`);
             }
         }
 
@@ -1057,8 +1057,8 @@ client.on('messageCreate', async message => {
 
         if (wordParts.length !== 2) {
             setBalance(userId, getBalance(userId) - PENALTY_ERR);
-            await message.reply(`❌ Từ **"${inputWord}"** không phải là từ ghép 2 tiếng! (-${formatMoney(PENALTY_ERR)})`);
-            return message.react('❌');
+            await message.reply(`<a:no:1554602168093507685> Từ **"${inputWord}"** không phải là từ ghép 2 tiếng! (-${formatMoney(PENALTY_ERR)})`);
+            return message.react('<:tu_choii:1554623553452777534>');
         }
 
         const wordSession = getWordSession(guildId);
@@ -1067,27 +1067,27 @@ client.on('messageCreate', async message => {
 
         if (wordSession.lastUserId === userId) {
             setBalance(userId, getBalance(userId) - PENALTY_ERR);
-            await message.reply(`⚠️ Bạn phải đợi người khác nối tiếp! (-${formatMoney(PENALTY_ERR)})`);
-            return message.react('❌');
+            await message.reply(`<a:as_warning:1554611415514357760> Bạn phải đợi người khác nối tiếp! (-${formatMoney(PENALTY_ERR)})`);
+            return message.react('<:tu_choii:1554623553452777534>');
         }
 
         if (wordParts[0] !== requiredStartWord) {
             setBalance(userId, getBalance(userId) - PENALTY_ERR);
-            await message.reply(`❌ Phải bắt đầu bằng từ **"${requiredStartWord}"**! (-${formatMoney(PENALTY_ERR)})`);
-            return message.react('❌');
+            await message.reply(`<a:no:1554602168093507685> Phải bắt đầu bằng từ **"${requiredStartWord}"**! (-${formatMoney(PENALTY_ERR)})`);
+            return message.react('<:tu_choii:1554623553452777534>');
         }
 
         if (wordSession.usedWords.has(inputWord)) {
             setBalance(userId, getBalance(userId) - PENALTY_ERR);
-            await message.reply(`❌ Từ **"${inputWord}"** đã dùng trước đó! (-${formatMoney(PENALTY_ERR)})`);
-            return message.react('❌');
+            await message.reply(`<a:no:1554602168093507685> Từ **"${inputWord}"** đã dùng trước đó! (-${formatMoney(PENALTY_ERR)})`);
+            return message.react('<:tu_choii:1554623553452777534>');
         }
 
         const isExistInDict = await checkVietnameseWordOnline(inputWord);
         if (!isExistInDict) {
             setBalance(userId, getBalance(userId) - PENALTY_ERR);
-            await message.reply(`❌ Từ **"${inputWord}"** không có trong từ điển! (-${formatMoney(PENALTY_ERR)})`);
-            return message.react('❌');
+            await message.reply(`<a:no:1554602168093507685> Từ **"${inputWord}"** không có trong từ điển! (-${formatMoney(PENALTY_ERR)})`);
+            return message.react('<:tu_choii:1554623553452777534>');
         }
 
         wordSession.currentWord = inputWord;
@@ -1115,11 +1115,11 @@ client.on('messageCreate', async message => {
             const embed = new EmbedBuilder()
                 .setColor('Gold')
                 .setTitle('🏨 HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN 24/7')
-                .setDescription('Thuê phòng riêng tư để nhận ngay **Danh mục, Kênh Chat và Kênh Voice độc quyền**!\n\n• **Phòng VIP:** `1.500.000đ` (Thuế: 200.000đ/giờ)\n• **Phòng Hoàng Gia:** `5.000.000đ` (Thuế: 500.000đ/giờ)\n\n*Bấm nút bên dưới để chọn phòng muốn thuê:*');
+                .setDescription('Thuê phòng riêng tư để nhận ngay **Danh mục, Kênh Chat và Kênh Voice độc quyền**!\n\n• **Phòng VIP:** `1.500.000đ` (Thuế: 200.000đ/giờ)\n• **Phòng Tổng Thống:** `5.000.000đ` (Thuế: 500.000đ/giờ)\n\n*Bấm nút bên dưới để chọn phòng muốn thuê:*');
 
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('hotel_vip').setLabel('👑 Thuê Phòng VIP (1.5 Tr)').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('hotel_hoanggia').setLabel('🌟 Thuê Phòng Hoàng Gia (5 Tr)').setStyle(ButtonStyle.Primary)
+                new ButtonBuilder().setCustomId('hotel_vip').setLabel('<:lr:1554621025562525788> Thuê Phòng VIP (1.5 Tr)').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('hotel_hoanggia').setLabel('<a:lg:1554620960034791424> Thuê Phòng Tổng Thống (5 Tr)').setStyle(ButtonStyle.Primary)
             );
 
             return message.reply({ embeds: [embed], components: [row] });
