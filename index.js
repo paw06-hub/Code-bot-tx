@@ -218,7 +218,7 @@ const getCoinSelectMenu = (actionType) => {
 async function broadcastCryptoUpdate() {
     let marketText = '';
     for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
-        const trendEmoji = coin.change > 0 ? '🟢 ▲' : (coin.change < 0 ? '🔴 ▼' : '🟡 ➖');
+        const trendEmoji = coin.change > 0 ? '<:stonks:1554601546820493472> ▲' : (coin.change < 0 ? '<:notstonks:1554601468810756266> ▼' : '🟡 ➖');
         const sign = coin.change > 0 ? '+' : '';
         marketText += `${trendEmoji} **${coin.name} (${symbol})**: **${formatMoney(coin.price)}** (${sign}${coin.change}%)\n`;
     }
@@ -291,9 +291,9 @@ function scheduleHotelTaxes() {
                 const bal = getBalance(ownerId);
                 if (bal >= taxAmount) {
                     setBalance(ownerId, bal - taxAmount);
-                    channel.send(`🔔 <@${ownerId}> Đã đến hạn đóng thuế phòng khách sạn! Hệ thống đã tự động thu **-${formatMoney(taxAmount)}** phí duy trì phòng.`).catch(() => {});
+                    channel.send(`<:notificacao:1554632317228683446> <@${ownerId}> Đã đến hạn đóng thuế phòng khách sạn! Hệ thống đã tự động thu **-${formatMoney(taxAmount)}** phí duy trì phòng.`).catch(() => {});
                 } else {
-                    channel.send(`⚠️ <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi[span_1](start_span)[span_1](end_span)!`).catch(() => {});
+                    channel.send(`<a:aawarn:1554622466297565267> <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi[span_1](start_span)[span_1](end_span)!`).catch(() => {});
                     
                     const category = channel.parent;
                     if (category) {
@@ -456,8 +456,8 @@ async function processLotteryDraw(isManual = false) {
     lotteryData.lodeBets = [];
     saveJSONSync(FILES.LOTTERY, lotteryData);
 
-    const titleText = isManual ? '🎰 KẾT QUẢ XỔ SỐ & LÔ ĐỀ (QUAY THỦ CÔNG)' : '🎰 KẾT QUẢ XỔ SỐ & LÔ ĐỀ HÔM NAY (18:00)';
-    const headerMsg = isManual ? '⚡ **THÔNG BÁO: QUAY THƯỞNG XỔ SỐ THEO YÊU CẦU AD!**' : '🔔 **ĐÃ ĐẾN GIỜ QUAY THƯỞNG XỔ SỐ THƯỜNG NIÊN (18:00)!**';
+    const titleText = isManual ? '<:emoji_80:1554614708089126994> KẾT QUẢ XỔ SỐ & LÔ ĐỀ (QUAY THỦ CÔNG)' : '<:emoji_80:1554614708089126994> KẾT QUẢ XỔ SỐ & LÔ ĐỀ HÔM NAY (18:00)';
+    const headerMsg = isManual ? '⚡ **THÔNG BÁO: QUAY THƯỞNG XỔ SỐ THEO YÊU CẦU AD!**' : '<:emoji_8:1554594801972678726> **ĐÃ ĐẾN GIỜ QUAY THƯỞNG XỔ SỐ THƯỜNG NIÊN (18:00)!**';
 
     const embed = new EmbedBuilder()
         .setColor('Red')
@@ -642,7 +642,7 @@ async function startTaiXiuLoop(guildId, channelId) {
 
         const embedResult = new EmbedBuilder()
             .setColor(res === 'tai' ? 'Green' : res === 'xiu' ? 'Blue' : 'Red')
-            .setTitle(`🎲 KẾT QUẢ PHIÊN #${txSession.sessionNumber}`)
+            .setTitle(`<:emoji_8:1554594813402161252> KẾT QUẢ PHIÊN #${txSession.sessionNumber}`)
             .setDescription(resultText)
             .setTimestamp();
 
@@ -683,7 +683,7 @@ client.on('interactionCreate', async interaction => {
             const userBal = getBalance(user.id);
 
             if (userBal < roomInfo.price) {
-                return interaction.reply({ content: `❌ Số dư không đủ để thuê phòng ${roomInfo.name}! Cần **${formatMoney(roomInfo.price)}** nhưng bạn chỉ có **${formatMoney(userBal)}**.`, ephemeral: true });
+                return interaction.reply({ content: `<a:no:1554602168093507685> Số dư không đủ để thuê phòng ${roomInfo.name}! Cần **${formatMoney(roomInfo.price)}** nhưng bạn chỉ có **${formatMoney(userBal)}**.`, ephemeral: true });
             }
 
             // Trừ tiền thuê phòng
@@ -737,29 +737,29 @@ client.on('interactionCreate', async interaction => {
                     .setTitle(`🏨 HƯỚNG DẪN SỬ DỤNG PHÒNG ${roomInfo.name.toUpperCase()}`)
                     .setDescription(`Chào mừng <@${user.id}> đã sở hữu không gian riêng tư thành công! Dưới đây là các đặc quyền và lệnh quản lý phòng của bạn:`)
                     .addFields(
-                        { name: '👥 Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`\n• Đuổi: `!duoi @user`', inline: true },
-                        { name: '✏ Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
-                        { name: '🚪 Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng và nhận lại 50% tiền VNĐ**[span_2](start_span)[span_2](end_span).', inline: false },
-                        { name: '💰 Thông tin thuế & Duy trì', value: `• Giá thuê: **${formatMoney(roomInfo.price)}**\n• Phí duy trì: **${formatMoney(roomInfo.tax)} / giờ** (Trừ tự động vào ví).`, inline: false },
-                        { name: '⚠️ Lưu ý', value: 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng sẽ tự động bị thu hồi[span_3](start_span)[span_3](end_span)!', inline: false }
+                        { name: '<:33218colorroledotspackids:1554608256804982854> Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`\n• Đuổi: `!duoi @user`', inline: true },
+                        { name: '<a:2902originallyknownas:1554631297035407364> Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
+                        { name: '<a:3642bunpay:1554630887629656115> Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng và nhận lại 50% tiền VNĐ**[span_2](start_span)[span_2](end_span).', inline: false },
+                        { name: '<:emoji_11:1554594841084690483> Thông tin thuế & Duy trì', value: `• Giá thuê: **${formatMoney(roomInfo.price)}**\n• Phí duy trì: **${formatMoney(roomInfo.tax)} / giờ** (Trừ tự động vào ví).`, inline: false },
+                        { name: '<a:as_warning:1554611415514357760> Lưu ý', value: 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng sẽ tự động bị thu hồi[span_3](start_span)[span_3](end_span)!', inline: false }
                     )
                     .setTimestamp();
 
                 await textChannel.send({ content: `🎉 Chủ nhân <@${user.id}> đã nhận phòng thành công!`, embeds: [guideEmbed] });
 
-                return interaction.editReply({ content: `✅ Thuê phòng thành công! Kênh riêng của bạn đã được khởi tạo tại danh mục mới.` });
+                return interaction.editReply({ content: `<a:yes:1554602231389487125> Thuê phòng thành công! Kênh riêng của bạn đã được khởi tạo tại danh mục mới.` });
             } catch (err) {
                 console.error('[Hotel Creation Error]:', err);
-                return interaction.editReply({ content: '❌ Có lỗi xảy ra khi tạo phòng tự động. Vui lòng thử lại sau!' });
+                return interaction.editReply({ content: '<a:no:1554602168093507685> Có lỗi xảy ra khi tạo phòng tự động. Vui lòng thử lại sau!' });
             }
         }
 
         if (interaction.isButton() && ['bet_tai', 'bet_xiu'].includes(interaction.customId)) {
             if (channelId !== targetChannelId) {
-                return interaction.reply({ content: '❌ Nút chỉ dùng trong kênh cược!', ephemeral: true });
+                return interaction.reply({ content: '<a:no:1554602168093507685> Nút chỉ dùng trong kênh cược!', ephemeral: true });
             }
             if (!txSession.isOpen) {
-                return interaction.reply({ content: '⏳ Hết thời gian đặt cược!', ephemeral: true });
+                return interaction.reply({ content: '<a:emoji_11:1554594850605899887> Hết thời gian đặt cược!', ephemeral: true });
             }
 
             const choice = interaction.customId === 'bet_tai' ? 'tai' : 'xiu';
@@ -784,12 +784,12 @@ client.on('interactionCreate', async interaction => {
                 const bet = parseInt(interaction.fields.getTextInputValue('bet_amount'), 10);
 
                 if (isNaN(bet) || bet <= 0) {
-                    return interaction.reply({ content: '❌ Số tiền không hợp lệ!', ephemeral: true });
+                    return interaction.reply({ content: '<a:no:1554602168093507685> Số tiền không hợp lệ!', ephemeral: true });
                 }
 
                 const bal = getBalance(user.id);
                 if (bet > bal) {
-                    return interaction.reply({ content: `❌ Số dư không đủ! Hiện có: **${formatMoney(bal)}**.`, ephemeral: true });
+                    return interaction.reply({ content: `<a:no:1554602168093507685> Số dư không đủ! Hiện có: **${formatMoney(bal)}**.`, ephemeral: true });
                 }
 
                 txSession.bets.set(user.id, { choice, amount: bet });
@@ -805,17 +805,17 @@ client.on('interactionCreate', async interaction => {
                 const amount = parseInt(interaction.fields.getTextInputValue('crypto_amount'), 10);
 
                 if (isNaN(amount) || amount <= 0) {
-                    return interaction.reply({ content: '❌ Số lượng không hợp lệ!', ephemeral: true });
+                    return interaction.reply({ content: '<a:no:1554602168093507685> Số lượng không hợp lệ!', ephemeral: true });
                 }
 
                 const coin = cryptoMarket.coins[symbol];
-                if (!coin) return interaction.reply({ content: '❌ Mã coin không tồn tại!', ephemeral: true });
+                if (!coin) return interaction.reply({ content: '<a:no:1554602168093507685> Mã coin không tồn tại!', ephemeral: true });
 
                 if (isBuy) {
                     const totalPrice = coin.price * amount;
                     const userBal = getBalance(user.id);
                     if (userBal < totalPrice) {
-                        return interaction.reply({ content: `❌ Không đủ tiền! Cần **${formatMoney(totalPrice)}**, ví có **${formatMoney(userBal)}**.`, ephemeral: true });
+                        return interaction.reply({ content: `<a:no:1554602168093507685> Không đủ tiền! Cần **${formatMoney(totalPrice)}**, ví có **${formatMoney(userBal)}**.`, ephemeral: true });
                     }
                     setBalance(user.id, userBal - totalPrice);
                     const portfolio = getUserPortfolio(user.id);
@@ -827,7 +827,7 @@ client.on('interactionCreate', async interaction => {
                     const portfolio = getUserPortfolio(user.id);
                     const userOwned = portfolio[symbol] || 0;
                     if (userOwned < amount) {
-                        return interaction.reply({ content: `❌ Bạn chỉ sở hữu **${userOwned} ${symbol}**, không đủ để bán!`, ephemeral: true });
+                        return interaction.reply({ content: `<a:no:1554602168093507685> Bạn chỉ sở hữu **${userOwned} ${symbol}**, không đủ để bán!`, ephemeral: true });
                     }
                     const totalReceive = coin.price * amount;
                     portfolio[symbol] -= amount;
@@ -855,7 +855,7 @@ client.on('interactionCreate', async interaction => {
                     .setCustomId('crypto_amount')
                     .setLabel(`Nhập số lượng ${selectedSymbol} muốn giao dịch:`)
                     .setStyle(TextInputStyle.Short)
-                    .setPlaceholder('VD: 2')
+                    .setPlaceholder('VD: 10')
                     .setRequired(true);
 
                 modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
@@ -866,7 +866,7 @@ client.on('interactionCreate', async interaction => {
                 const chartUrl = getCryptoChartUrl(selectedSymbol, coin);
                 const embed = new EmbedBuilder()
                     .setColor('Blurple')
-                    .setTitle(`📈 BIỂU ĐỒ GIÁ - ${coin.name} (${selectedSymbol})`)
+                    .setTitle(`<a:emoji_5:1554592992008867930> BIỂU ĐỒ GIÁ - ${coin.name} (${selectedSymbol})`)
                     .setDescription(`Giá hiện tại: **${formatMoney(coin.price)}** | Biến động: **${coin.change > 0 ? '+' : ''}${coin.change}%**`)
                     .setImage(chartUrl);
 
@@ -881,7 +881,7 @@ client.on('interactionCreate', async interaction => {
                 const portfolio = getUserPortfolio(user.id);
                 const ownedKeys = Object.keys(portfolio);
                 if (ownedKeys.length === 0) {
-                    return interaction.reply({ content: '💼 Danh mục đầu tư của bạn đang trống.', ephemeral: true });
+                    return interaction.reply({ content: '<:Brim_LUL:1554629586275405884> Danh mục đầu tư của bạn đang trống.', ephemeral: true });
                 }
                 let desc = '';
                 let totalValue = 0;
@@ -896,25 +896,25 @@ client.on('interactionCreate', async interaction => {
                 }
                 const embed = new EmbedBuilder()
                     .setColor('Aqua')
-                    .setTitle(`💼 DANH MỤC ĐẦU TƯ - ${user.username}`)
+                    .setTitle(`<:Brim_LUL:1554629586275405884> DANH MỤC ĐẦU TƯ - ${user.username}`)
                     .setDescription(desc)
-                    .addFields({ name: '📊 Tổng tài sản', value: `**${formatMoney(totalValue)}**`, inline: false });
+                    .addFields({ name: '<:azu_vnd:1554629080194744371> Tổng tài sản', value: `**${formatMoney(totalValue)}**`, inline: false });
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             if (customId === 'c_menu_buy') {
                 const row = getCoinSelectMenu('buy');
-                return interaction.reply({ content: '🛒 **Chọn đồng coin bạn muốn MUA:**', components: [row], ephemeral: true });
+                return interaction.reply({ content: '<a:buy:1554628524936273970> **Chọn đồng coin bạn muốn MUA:**', components: [row], ephemeral: true });
             }
 
             if (customId === 'c_menu_sell') {
                 const row = getCoinSelectMenu('sell');
-                return interaction.reply({ content: '💰 **Chọn đồng coin bạn muốn BÁN:**', components: [row], ephemeral: true });
+                return interaction.reply({ content: '<:Money:1554628369797222534> **Chọn đồng coin bạn muốn BÁN:**', components: [row], ephemeral: true });
             }
 
             if (customId === 'c_menu_chart') {
                 const row = getCoinSelectMenu('chart');
-                return interaction.reply({ content: '📈 **Chọn đồng coin bạn muốn xem biểu đồ:**', components: [row], ephemeral: true });
+                return interaction.reply({ content: '<:coins:1554628216063397900> **Chọn đồng coin bạn muốn xem biểu đồ:**', components: [row], ephemeral: true });
             }
         }
 
