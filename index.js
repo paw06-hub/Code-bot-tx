@@ -1351,21 +1351,21 @@ client.on('messageCreate', async message => {
         if (['kqsx', 'quayso', 'eplode'].includes(command)) {
             if (!isBotStaff(userId)) return message.reply('❌ Bạn không có quyền ép quay số!');
             
-            await message.reply('🎲 **Đang tiến hành quay số KQSX & Lô Đề ngay lập tức...**');
+            await message.reply('<:emoji_80:1554614708089126994> **Đang tiến hành quay số KQSX & Lô Đề ngay lập tức...**');
             const resData = await processLotteryDraw(true);
             
             if (resData.sentCount === 0) {
-                return message.channel.send('⚠ Đã quay xong kết quả nhưng chưa có kênh nào được cài đặt bằng lệnh `!setlode`!');
+                return message.channel.send('<a:cb:1554593663567274106>Đã quay xong kết quả nhưng chưa có kênh nào được cài đặt bằng lệnh `!setlode`!');
             }
             return;
         }
 
         if (command === 'importdata') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền import dữ liệu!');
+            if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền Khôi Phục dữ liệu!');
             
             const attachments = Array.from(message.attachments.values());
             if (attachments.length === 0) {
-                return message.reply('❌ Vui lòng đính kèm ít nhất một file `.json` cần import kèm theo lệnh `!importdata`!');
+                return message.reply('<a:no:1554602168093507685> Vui lòng đính kèm ít nhất một file `.json` cần import kèm theo lệnh `!importdata`!');
             }
 
             let successCount = 0;
@@ -1407,7 +1407,7 @@ client.on('messageCreate', async message => {
 
             let replyMessage = `<a:yes:1554602231389487125> Đã import thành công **${successCount}/${attachments.length}** file dữ liệu! Bot đã tự động nạp lại bộ nhớ RAM.`;
             if (failedFiles.length > 0) {
-                replyMessage += `\n⚠️ Các file lỗi/không nhận diện: ${failedFiles.join(', ')}`;
+                replyMessage += `\n<a:as_warning:1554611415514357760> Các file lỗi/không nhận diện: ${failedFiles.join(', ')}`;
             }
 
             return message.reply(replyMessage);
