@@ -922,7 +922,7 @@ client.on('interactionCreate', async interaction => {
             const gameKey = `${guildId}_${user.id}`;
             const game = bjGames.get(gameKey);
 
-            if (!game) return interaction.reply({ content: '❌ Ván đấu đã kết thúc!', ephemeral: true });
+            if (!game) return interaction.reply({ content: '<a:cb:1554593663567274106> Ván đấu đã kết thúc!', ephemeral: true });
 
             if (interaction.customId === 'bj_hit') {
                 game.playerHand.push(game.deck.pop());
@@ -936,14 +936,14 @@ client.on('interactionCreate', async interaction => {
                     .setColor('DarkGreen')
                     .setTitle(`🃏 BLACKJACK - ${user.username}`)
                     .addFields(
-                        { name: '🤖 Nhà Cái', value: `${formatHand(game.dealerHand, true)} (?? điểm)` },
-                        { name: '👤 Bạn', value: `${formatHand(game.playerHand)} (${playerScore} điểm)` }
+                        { name: '<a:vuongmiendo:1554622871882436710> @Paw162', value: `${formatHand(game.dealerHand, true)} (?? điểm)` },
+                        { name: '<:Members:1554622922629451828> Bạn', value: `${formatHand(game.playerHand)} (${playerScore} điểm)` }
                     )
                     .setFooter({ text: `Tiền cược: ${formatMoney(game.bet)}` });
 
                 const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('bj_hit').setLabel('🃏 RÚT (HIT)').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId('bj_stand').setLabel('🛑 DẰN (STAND)').setStyle(ButtonStyle.Danger)
+                    new ButtonBuilder().setCustomId('bj_hit').setLabel('<:VoteYes:1554627655507247104> RÚT (HIT)').setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId('bj_stand').setLabel('<:yes:1554627811317383258> DẰN (STAND)').setStyle(ButtonStyle.Danger)
                 );
 
                 return interaction.update({ embeds: [embed], components: [row] });
@@ -981,19 +981,19 @@ async function finishBlackjackGame(interaction, gameKey, game) {
     const isNguLinh = playerHand.length === 5 && playerScore <= 21;
 
     if (playerScore > 21) {
-        resultMessage = `💥 **Bạn đã QUẮC (${playerScore} điểm)!** Bị trừ **-${formatMoney(bet)}**.`;
+        resultMessage = `<:emoji_4:1554625281686249507> **Bạn đã QUẮC (${playerScore} điểm)!** Bị trừ **-${formatMoney(bet)}**.`;
         setBalance(user.id, currentBal - bet);
     } else if (isXiBan) {
         winAmount = Math.floor(bet * 2);
-        resultMessage = `🔥 **XÌ BÀN!** Nhận thưởng lớn **+${formatMoney(winAmount)}**!`;
+        resultMessage = `<a:luavang:1554626974914453594> **XÌ BÀN!** Nhận thưởng lớn **+${formatMoney(winAmount)}**!`;
         setBalance(user.id, currentBal + winAmount);
     } else if (isPlayerBJ && !isDealerBJ) {
         winAmount = Math.floor(bet * 1.5);
-        resultMessage = `🏆 **BLACKJACK!** Bạn nhận **+${formatMoney(winAmount)}**!`;
+        resultMessage = `<:new:1554626843280285746> **BLACKJACK!** Bạn nhận **+${formatMoney(winAmount)}**!`;
         setBalance(user.id, currentBal + winAmount);
     } else if (isNguLinh) {
         winAmount = Math.floor(bet * 2);
-        resultMessage = `🌟 **NGŨ LINH!** Bạn thắng **+${formatMoney(winAmount)}**!`;
+        resultMessage = `<:sao_vang:1554626148791615488> **NGŨ LINH!** Bạn thắng **+${formatMoney(winAmount)}**!`;
         setBalance(user.id, currentBal + winAmount);
     } else if (dealerScore > 21) {
         winAmount = bet;
