@@ -795,7 +795,7 @@ client.on('interactionCreate', async interaction => {
                 txSession.bets.set(user.id, { choice, amount: bet });
                 await updateOpenEmbed(txSession);
 
-                return interaction.reply({ content: `✅ Đã cược **${formatMoney(bet)}** vào **${choice.toUpperCase()}**!`, ephemeral: true });
+                return interaction.reply({ content: `<a:yes:1554602231389487125> Đã cược **${formatMoney(bet)}** vào **${choice.toUpperCase()}**!`, ephemeral: true });
             }
 
             if (interaction.customId.startsWith('modal_trade_')) {
@@ -822,7 +822,7 @@ client.on('interactionCreate', async interaction => {
                     portfolio[symbol] = (portfolio[symbol] || 0) + amount;
                     setUserPortfolio(user.id, portfolio);
 
-                    return interaction.reply({ content: `✅ Mua thành công **${amount} ${symbol}** (${coin.name}) với giá **${formatMoney(totalPrice)}**!`, ephemeral: true });
+                    return interaction.reply({ content: `<a:yes:1554602231389487125> Mua thành công **${amount} ${symbol}** (${coin.name}) với giá **${formatMoney(totalPrice)}**!`, ephemeral: true });
                 } else {
                     const portfolio = getUserPortfolio(user.id);
                     const userOwned = portfolio[symbol] || 0;
@@ -835,7 +835,7 @@ client.on('interactionCreate', async interaction => {
                     setUserPortfolio(user.id, portfolio);
                     setBalance(user.id, getBalance(user.id) + totalReceive);
 
-                    return interaction.reply({ content: `✅ Bán thành công **${amount} ${symbol}** (${coin.name}), nhận về **+${formatMoney(totalReceive)}**!`, ephemeral: true });
+                    return interaction.reply({ content: `<a:yes:1554602231389487125> Bán thành công **${amount} ${symbol}** (${coin.name}), nhận về **+${formatMoney(totalReceive)}**!`, ephemeral: true });
                 }
             }
         }
@@ -1158,7 +1158,7 @@ client.on('messageCreate', async message => {
                         }
                     }
                 }
-                return message.reply(`✅ Đã mời thành công ${targetUser} vào phòng khách sạn của bạn!`);
+                return message.reply(`<a:yes:1554602231389487125> Đã mời thành công ${targetUser} vào phòng khách sạn của bạn!`);
             } catch (err) {
                 console.error('[Room Invite Error]:', err);
                 return message.reply('❌ Có lỗi xảy ra khi cấp quyền cho thành viên.');
@@ -1189,7 +1189,7 @@ client.on('messageCreate', async message => {
                         }
                     }
                 }
-                return message.reply(`✅ Đã thu hồi quyền và đuổi ${targetUser} khỏi phòng thành công!`);
+                return message.reply(`<a:yes:1554602231389487125> Đã thu hồi quyền và đuổi ${targetUser} khỏi phòng thành công!`);
             } catch (err) {
                 console.error('[Room Kick Error]:', err);
                 return message.reply('❌ Có lỗi xảy ra khi tước quyền thành viên.');
@@ -1216,7 +1216,7 @@ client.on('messageCreate', async message => {
                         }
                     }
                 }
-                return message.reply(`✅ Đã đổi tên phòng khách sạn thành công thành: **${newName}**!`);
+                return message.reply(`<a:yes:1554602231389487125> Đã đổi tên phòng khách sạn thành công thành: **${newName}**!`);
             } catch (err) {
                 console.error('[Room Rename Error]:', err);
                 return message.reply('❌ Có lỗi xảy ra khi đổi tên phòng (Discord giới hạn số lần đổi tên kênh, hãy thử lại sau ít phút).');
@@ -1269,7 +1269,7 @@ client.on('messageCreate', async message => {
             // Cộng lại tiền vào ví chủ phòng
             setBalance(roomInfo.ownerId, currentBal + refundAmount);
 
-            await message.reply(`✅ Bạn đã tiến hành trả phòng thành công! Hệ thống đã hoàn lại **+${formatMoney(refundAmount)}** (50% giá trị phòng) vào ví của <@${roomInfo.ownerId}>. Danh mục phòng sẽ được xóa sau 3 giây...`);
+            await message.reply(`<a:yes:1554602231389487125> Bạn đã tiến hành trả phòng thành công! Hệ thống đã hoàn lại **+${formatMoney(refundAmount)}** (50% giá trị phòng) vào ví của <@${roomInfo.ownerId}>. Danh mục phòng sẽ được xóa sau 3 giây...`);
 
             // Xóa toàn bộ kênh và danh mục phòng sau 3 giây
             setTimeout(async () => {
@@ -1319,7 +1319,7 @@ client.on('messageCreate', async message => {
             saveJSONSync(FILES.LOTTERY, lotteryData);
 
             const rateText = command === 'de' ? '1 ăn 70 (Giải Đặc Biệt)' : '1 ăn 3.5 mỗi nháy (27 giải)';
-            return message.reply(`✅ Đã đặt cược **${command.toUpperCase()} ${num}** với số tiền **${formatMoney(bet)}**! Tỉ lệ: **${rateText}**. Đợi kết quả lúc 18:00!`);
+            return message.reply(`<a:yes:1554602231389487125> Đã đặt cược **${command.toUpperCase()} ${num}** với số tiền **${formatMoney(bet)}**! Tỉ lệ: **${rateText}**. Đợi kết quả lúc 18:00!`);
         }
 
         if (command === 'veso' || command === 'muaveso') {
@@ -1405,7 +1405,7 @@ client.on('messageCreate', async message => {
             portfolios = loadJSON(FILES.PORTFOLIO);
             hotelData = loadJSON(FILES.HOTELS, false);
 
-            let replyMessage = `✅ Đã import thành công **${successCount}/${attachments.length}** file dữ liệu! Bot đã tự động nạp lại bộ nhớ RAM.`;
+            let replyMessage = `<a:yes:1554602231389487125> Đã import thành công **${successCount}/${attachments.length}** file dữ liệu! Bot đã tự động nạp lại bộ nhớ RAM.`;
             if (failedFiles.length > 0) {
                 replyMessage += `\n⚠️ Các file lỗi/không nhận diện: ${failedFiles.join(', ')}`;
             }
@@ -1428,7 +1428,7 @@ client.on('messageCreate', async message => {
 
             adminList.users.push(targetUser.id);
             saveJSONSync(FILES.ADMINS, adminList);
-            return message.reply(`✅ Đã thêm ${targetUser} vào danh sách Admin phụ thành công!`);
+            return message.reply(`<a:yes:1554602231389487125> Đã thêm ${targetUser} vào danh sách Admin phụ thành công!`);
         }
 
         if (command === 'removeadmin' || command === 'deladmin') {
@@ -1443,7 +1443,7 @@ client.on('messageCreate', async message => {
 
             adminList.users.splice(index, 1);
             saveJSONSync(FILES.ADMINS, adminList);
-            return message.reply(`✅ Đã gỡ bỏ quyền Admin phụ của ${targetUser}.`);
+            return message.reply(`<a:yes:1554602231389487125> Đã gỡ bỏ quyền Admin phụ của ${targetUser}.`);
         }
 
         if (command === 'listadmin' || command === 'admins') {
@@ -1458,7 +1458,7 @@ client.on('messageCreate', async message => {
 
             const embed = new EmbedBuilder()
                 .setColor('Gold')
-                .setTitle('👑 DANH SÁCH QUẢN TRỊ VIÊN CẤP CAO (ADMIN)')
+                .setTitle('👑 Danh Sách Admin BOT')
                 .setDescription(desc);
             return message.reply({ embeds: [embed] });
         }
@@ -1474,7 +1474,7 @@ client.on('messageCreate', async message => {
 
             staffList.users.push(targetUser.id);
             saveJSONSync(FILES.STAFFS, staffList);
-            return message.reply(`✅ Đã thêm ${targetUser} vào danh sách Quản Trị Viên (Staff)!`);
+            return message.reply(`<a:yes:1554602231389487125> Đã thêm ${targetUser} vào danh sách Quản Trị Viên (Staff)!`);
         }
 
         if (command === 'removestaff' || command === 'delstaff') {
@@ -1489,7 +1489,7 @@ client.on('messageCreate', async message => {
 
             staffList.users.splice(index, 1);
             saveJSONSync(FILES.STAFFS, staffList);
-            return message.reply(`✅ Đã gỡ bỏ ${targetUser} khỏi danh sách Staff.`);
+            return message.reply(`<a:yes:1554602231389487125> Đã gỡ bỏ ${targetUser} khỏi danh sách Staff.`);
         }
 
         if (command === 'liststaff' || command === 'staffs') {
@@ -1583,7 +1583,7 @@ client.on('messageCreate', async message => {
             config[guildId].cryptoChannelId = targetChannel.id;
             saveJSONSync(FILES.CONFIG, config);
 
-            return message.reply(`✅ Đã thiết lập kênh thông báo biến động Crypto tự động tại ${targetChannel}.`);
+            return message.reply(`<a:yes:1554602231389487125> Đã thiết lập kênh thông báo biến động Crypto tự động tại ${targetChannel}.`);
         }
 
         // LỆNH VAY TIỀN NGÂN HÀNG (SỬ DỤNG HẠN MỨC 1 TỶ)
@@ -1594,7 +1594,7 @@ client.on('messageCreate', async message => {
             if (isNaN(amount) || amount <= 0) {
                 const embed = new EmbedBuilder()
                     .setColor('Yellow')
-                    .setTitle('🏦 NGÂN HÀNG DISCORD - THÔNG TIN VAY')
+                    .setTitle('🏦 NGÂN HÀNG 2ChânBank - THÔNG TIN VAY')
                     .setDescription(`• Lãi suất cố định: **${LOAN_INTEREST_RATE * 100}%**\n• Hạn ngạch tối đa: **${formatMoney(MAX_LOAN_LIMIT)}**\n• Nợ hiện tại của bạn: **${formatMoney(currentDebt)}**`);
                 return message.reply({ embeds: [embed] });
             }
@@ -1606,7 +1606,7 @@ client.on('messageCreate', async message => {
             setLoan(userId, totalDebtWithInterest);
             setBalance(userId, getBalance(userId) + amount);
 
-            return message.reply(`✅ Vay thành công **+${formatMoney(amount)}**. Tổng nợ cần trả: **${formatMoney(totalDebtWithInterest)}**.`);
+            return message.reply(`<a:yes:1554602231389487125> +1 Con Nợ **+${formatMoney(amount)}**. Tổng nợ cần trả: **${formatMoney(totalDebtWithInterest)}**.`);
         }
 
         if (command === 'trano' || command === 'payloan') {
@@ -1616,10 +1616,10 @@ client.on('messageCreate', async message => {
             let payAmount = parseInt(args[0], 10);
             if (args[0]?.toLowerCase() === 'all') payAmount = currentDebt;
 
-            if (isNaN(payAmount) || payAmount <= 0) return message.reply(`❌ Cú pháp: \`!trano <số_tiền|all>\`. Nợ hiện tại: **${formatMoney(currentDebt)}**`);
+            if (isNaN(payAmount) || payAmount <= 0) return message.reply(`<a:no:1554602168093507685> Cú pháp: \`!trano <số_tiền|all>\`. Nợ hiện tại: **${formatMoney(currentDebt)}**`);
 
             const bal = getBalance(userId);
-            if (bal < payAmount) return message.reply(`❌ Số dư ví không đủ!`);
+            if (bal < payAmount) return message.reply(`<a:no:1554602168093507685> Số dư ví không đủ!`);
 
             const actualPayment = Math.min(payAmount, currentDebt);
             setBalance(userId, bal - actualPayment);
@@ -1629,7 +1629,7 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'exportdata') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền này!');
+            if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền này!');
             
             const allData = {};
             for (const [key, filePath] of Object.entries(FILES)) {
@@ -1653,36 +1653,36 @@ client.on('messageCreate', async message => {
                 if (fs.existsSync(backupFilePath)) fs.unlinkSync(backupFilePath);
             }, 5000);
 
-            return message.reply('✅ Đã đóng gói toàn bộ dữ liệu thành **1 file duy nhất** và gửi vào tin nhắn riêng cho bạn!');
+            return message.reply('<a:yes:1554602231389487125> Đã đóng gói toàn bộ dữ liệu thành **1 file duy nhất** và gửi vào tin nhắn riêng cho bạn!');
         }
 
         if (command === 'cong') {
-            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
+            if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Không có quyền!');
             const targetUser = message.mentions.users.first();
             const amount = parseInt(args[1], 10);
-            if (!targetUser || isNaN(amount)) return message.reply('❌ Sai cú pháp! VD: `!cong @user 50000`');
+            if (!targetUser || isNaN(amount)) return message.reply('<a:no:1554602168093507685> Sai cú pháp! VD: `!cong @user 50000`');
             setBalance(targetUser.id, getBalance(targetUser.id) + amount);
-            return message.reply(`✅ Đã cộng **${formatMoney(amount)}** cho ${targetUser}!`);
+            return message.reply(`<a:yes:1554602231389487125> Đã cộng **${formatMoney(amount)}** cho ${targetUser}!`);
         }
 
         if (command === 'tru') {
-            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
+            if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Không có quyền!');
             const targetUser = message.mentions.users.first();
             const amount = parseInt(args[1], 10);
-            if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('❌ Sai cú pháp! VD: `!tru @user 50000`');
+            if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('<a:no:1554602168093507685> Sai cú pháp! VD: `!tru @user 50000`');
             
             const currentBal = getBalance(targetUser.id);
             const newBal = Math.max(0, currentBal - amount); 
             setBalance(targetUser.id, newBal);
-            return message.reply(`✅ Đã trừ **${formatMoney(amount)}** của ${targetUser}! Số dư mới: **${formatMoney(newBal)}**`);
+            return message.reply(`<a:yes:1554602231389487125> Đã trừ **${formatMoney(amount)}** của ${targetUser}! Số dư mới: **${formatMoney(newBal)}**`);
         }
 
         if (command === 'resetmoney' || command === 'resetvon') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner gốc mới có quyền reset tiền hệ thống!');
+            if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền reset tiền hệ thống!');
             const targetUser = message.mentions.users.first();
             
             if (!targetUser && args[0]?.toLowerCase() !== 'all') {
-                return message.reply('❌ Cú pháp: `!resetmoney @user` (hoặc `!resetmoney all` nếu muốn reset toàn server).');
+                return message.reply('<a:no:1554602168093507685> Cú pháp: `!resetmoney @user` (hoặc `!resetmoney all` nếu muốn reset toàn server).');
             }
 
             if (args[0]?.toLowerCase() === 'all') {
@@ -1698,53 +1698,53 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'settaixiu') {
-            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
+            if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Không có quyền!');
             const targetChannel = message.mentions.channels.first() || message.channel;
             const txSession = getSession(guildId);
             txSession.channelId = targetChannel.id;
             saveTaiXiuState(guildId, txSession);
-            await message.reply(`✅ Đã thiết lập kênh Tài Xỉu tại ${targetChannel}.`);
+            await message.reply(`<a:yes:1554602231389487125> Đã thiết lập kênh Tài Xỉu tại ${targetChannel}.`);
             startTaiXiuLoop(guildId, targetChannel.id);
             return;
         }
 
         if (command === 'setlode') {
-            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
+            if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Không có quyền!');
             const targetChannel = message.mentions.channels.first() || message.channel;
             lodeConfig[guildId] = targetChannel.id;
             saveJSONSync(FILES.LODE_CONFIG, lodeConfig);
-            return message.reply(`✅ Đã thiết lập kênh Lô Đề tại ${targetChannel}.`);
+            return message.reply(`<a:yes:1554602231389487125> Đã thiết lập kênh Lô Đề tại ${targetChannel}.`);
         }
 
         if (command === 'setnoitu') {
-            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
+            if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Không có quyền!');
             const targetChannel = message.mentions.channels.first() || message.channel;
             wordConfig[guildId] = targetChannel.id;
             saveJSONSync(FILES.WORD_CONFIG, wordConfig);
             startWordGameTimeout(guildId, targetChannel);
-            return message.reply(`✅ Đã thiết lập kênh Nối Từ tại ${targetChannel}.`);
+            return message.reply(`<a:yes:1554602231389487125> Đã thiết lập kênh Nối Từ tại ${targetChannel}.`);
         }
 
         if (command === 'settitle') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền cấp danh hiệu!');
+            if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền cấp danh hiệu!');
             const targetUser = message.mentions.users.first();
             const titleText = args.slice(1).join(' ');
-            if (!targetUser || !titleText) return message.reply('❌ Cú pháp: `!settitle @user <Tên danh hiệu>`');
+            if (!targetUser || !titleText) return message.reply('<a:no:1554602168093507685> Cú pháp: `!settitle @user <Tên danh hiệu>`');
             
             customTitles.set(targetUser.id, titleText);
             saveJSONSync(FILES.TITLES, customTitles);
-            return message.reply(`✅ Đã cấp danh hiệu **"${titleText}"** cho ${targetUser}!`);
+            return message.reply(`<a:yes:1554602231389487125> Đã cấp danh hiệu **"${titleText}"** cho ${targetUser}!`);
         }
 
         if (command === 'blackjack' || command === 'bj') {
             const gameKey = `${guildId}_${userId}`;
-            if (bjGames.has(gameKey)) return message.reply('❌ Bạn đang trong ván đấu khác!');
+            if (bjGames.has(gameKey)) return message.reply('<a:no:1554602168093507685> Bạn đang trong ván đấu khác!');
 
             const bet = parseInt(args[0], 10);
-            if (isNaN(bet) || bet <= 0) return message.reply('❌ Cú pháp: `!bj <số_tiền>`');
+            if (isNaN(bet) || bet <= 0) return message.reply('<a:no:1554602168093507685> Cú pháp: `!bj <số_tiền>`');
 
             const bal = getBalance(userId);
-            if (bet > bal) return message.reply('❌ Số dư không đủ!');
+            if (bet > bal) return message.reply('<a:no:1554602168093507685> Số dư không đủ!');
 
             const deck = createDeck();
             const playerHand = [deck.pop(), deck.pop()];
@@ -1818,17 +1818,17 @@ client.on('messageCreate', async message => {
             let titleText = customTitles.get(targetUser.id);
             if (!titleText) {
                 if (targetUser.id === ADMIN_ID || adminList.users.includes(targetUser.id)) {
-                    titleText = '👑 Quản Trị Tối Cao';
+                    titleText = '<a:Crown:1554608058460676167> Owner';
                 } else if (isBotStaff(targetUser.id)) {
-                    titleText = '🛡️ Quản Trị Viên';
+                    titleText = '<:994180roleadminred:1554607509724209153> Quản Trị Viên';
                 } else {
-                    titleText = '🌟 Thành Viên';
+                    titleText = '<:33218colorroledotspackids:1554608256804982854> Thành Viên';
                 }
             }
 
             const embed = new EmbedBuilder()
                 .setColor('Blurple')
-                .setTitle(`<:user:1554598652620709950> HỒ SƠ - ${targetUser.username}`)
+                .setTitle(`🪪 Profile - ${targetUser.username}`)
                 .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: '💲 Số dư', value: `**${formatMoney(bal)}**`, inline: false },
