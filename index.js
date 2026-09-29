@@ -1,7 +1,8 @@
 const { 
     Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, 
     ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle,
-    AttachmentBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder
+    AttachmentBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
+    ChannelType, PermissionFlagsBits
 } = require('discord.js');
 const fs = require('fs');
 const express = require('express');
@@ -28,7 +29,8 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildVoiceStates
     ]
 });
 
@@ -48,7 +50,8 @@ const FILES = {
     ADMINS: './admins.json',           
     LOANS: './loans.json',             
     CRYPTO: './crypto.json',           
-    PORTFOLIO: './portfolio.json'      
+    PORTFOLIO: './portfolio.json',
+    HOTELS: './hotels.json'            // Thêm file dữ liệu Khách sạn
 };
 
 // DATA MANAGERS & AUTO-SAVE IMMEDIATELY
@@ -83,12 +86,14 @@ let adminList = loadJSON(FILES.ADMINS, false);
 let loans = loadJSON(FILES.LOANS);
 let cryptoMarket = loadJSON(FILES.CRYPTO, false);
 let portfolios = loadJSON(FILES.PORTFOLIO);
+let hotelData = loadJSON(FILES.HOTELS, false); // Quản lý phòng khách sạn đang thuê
 
 if (!lotteryData.tickets) lotteryData.tickets = [];
 if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
 if (!lotteryData.lastResult) lotteryData.lastResult = null;
 if (!Array.isArray(staffList.users)) staffList.users = [];
 if (!Array.isArray(adminList.users)) adminList.users = [];
+if (!hotelData.rooms) hotelData.rooms = {}; // Cấu trúc: { channelId: { ownerId, type, price, taxTimer } }
 
 if (!cryptoMarket.coins) {
     cryptoMarket.coins = {
@@ -262,6 +267,53 @@ function updateCryptoPrices() {
 
 function scheduleCryptoMarket() {
     setInterval(updateCryptoPrices, 120000);
+}
+
+// ==========================================
+// HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN & TỰ ĐỘNG THU THUẾ
+// ==========================================
+const HOTEL_PRICES = {
+    vip: { name: 'Phòng VIP', price: 1500000, tax: 200000 },
+    hoanggia: { name: 'Phòng Hoàng Gia', price: 5000000, tax: 500000 }
+};
+
+function scheduleHotelTaxes() {
+    setInterval(async () => {
+        for (const [channelId, room] of Object.entries(hotelData.rooms)) {
+            const guild = client.guilds.cache.get(room.guildId);
+            if (!guild) continue;
+
+            const channel = guild.channels.cache.get(channelId);
+            const ownerId = room.ownerId;
+            const taxAmount = HOTEL_PRICES[room.type]?.tax || 200000;
+
+            if (channel) {
+                const bal = getBalance(ownerId);
+                if (bal >= taxAmount) {
+                    setBalance(ownerId, bal - taxAmount);
+                    channel.send(`🔔 <@${ownerId}> Đã đến hạn đóng thuế phòng khách sạn! Hệ thống đã tự động thu **-${formatMoney(taxAmount)}** phí duy trì phòng.`).catch(() => {});
+                } else {
+                    // Không đủ tiền đóng thuế -> Tự động giải tán phòng
+                    channel.send(`⚠️ <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi!`).catch(() => {});
+                    
+                    const category = channel.parent;
+                    if (category) {
+                        for (const child of category.children.cache.values()) {
+                            await child.delete().catch(() => {});
+                        }
+                        await category.delete().catch(() => {});
+                    } else {
+                        await channel.delete().catch(() => {});
+                    }
+                    delete hotelData.rooms[channelId];
+                    saveJSONSync(FILES.HOTELS, hotelData);
+                }
+            } else {
+                delete hotelData.rooms[channelId];
+                saveJSONSync(FILES.HOTELS, hotelData);
+            }
+        }
+    }, 3600000); // Kiểm tra và thu thuế mỗi 1 giờ
 }
 
 const getWordSession = (guildId) => {
@@ -614,6 +666,7 @@ client.once('ready', () => {
     }
     scheduleDailyLottery();
     scheduleCryptoMarket();
+    scheduleHotelTaxes(); // Khởi chạy tiến trình thu thuế khách sạn
 });
 
 client.on('interactionCreate', async interaction => {
@@ -623,6 +676,70 @@ client.on('interactionCreate', async interaction => {
         const { guildId, channelId, user } = interaction;
         const txSession = getSession(guildId);
         const targetChannelId = txSession.channelId;
+
+        // Xử lý nút chọn thuê phòng khách sạn
+        if (interaction.isButton() && (interaction.customId === 'hotel_vip' || interaction.customId === 'hotel_hoanggia')) {
+            const roomType = interaction.customId === 'hotel_vip' ? 'vip' : 'hoanggia';
+            const roomInfo = HOTEL_PRICES[roomType];
+            const userBal = getBalance(user.id);
+
+            if (userBal < roomInfo.price) {
+                return interaction.reply({ content: `❌ Số dư không đủ để thuê phòng ${roomInfo.name}! Cần **${formatMoney(roomInfo.price)}** nhưng bạn chỉ có **${formatMoney(userBal)}**.`, ephemeral: true });
+            }
+
+            // Trừ tiền thuê phòng
+            setBalance(user.id, userBal - roomInfo.price);
+
+            await interaction.deferReply({ ephemeral: true });
+
+            try {
+                // Tạo danh mục riêng cho phòng
+                const category = await interaction.guild.channels.create({
+                    name: `🏨 Khách Sạn - ${user.username}`,
+                    type: ChannelType.GuildCategory,
+                    permissionOverwrites: [
+                        {
+                            id: interaction.guild.id,
+                            deny: [PermissionFlagsBits.ViewChannel]
+                        },
+                        {
+                            id: user.id,
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]
+                        }
+                    ]
+                });
+
+                // Tạo kênh chat riêng
+                const textChannel = await interaction.guild.channels.create({
+                    name: `💬-phòng-${roomType}`,
+                    type: ChannelType.GuildText,
+                    parent: category.id
+                });
+
+                // Tạo kênh voice riêng
+                const voiceChannel = await interaction.guild.channels.create({
+                    name: `🔊 Voice ${roomInfo.name}`,
+                    type: ChannelType.GuildVoice,
+                    parent: category.id
+                });
+
+                // Lưu thông tin phòng vào hệ thống
+                hotelData.rooms[textChannel.id] = {
+                    guildId: guildId,
+                    ownerId: user.id,
+                    type: roomType,
+                    price: roomInfo.price
+                };
+                saveJSONSync(FILES.HOTELS, hotelData);
+
+                textChannel.send(`🎉 Chào mừng <@${user.id}> đã thuê thành công **${roomInfo.name}**!\n• Giá thuê: **${formatMoney(roomInfo.price)}**\n• Thuế định kỳ mỗi giờ: **${formatMoney(roomInfo.tax)}**\n\nBạn có toàn quyền quản lý kênh chat và voice trong danh mục này.`);
+
+                return interaction.editReply({ content: `✅ Thuê phòng thành công! Kênh riêng của bạn đã được khởi tạo tại danh mục mới.` });
+            } catch (err) {
+                console.error('[Hotel Creation Error]:', err);
+                return interaction.editReply({ content: '❌ Có lỗi xảy ra khi tạo phòng tự động. Vui lòng thử lại sau!' });
+            }
+        }
 
         if (interaction.isButton() && ['bet_tai', 'bet_xiu'].includes(interaction.customId)) {
             if (channelId !== targetChannelId) {
@@ -979,6 +1096,23 @@ client.on('messageCreate', async message => {
         const command = args.shift().toLowerCase();
 
         // ==========================================
+        // LỆNH THUÊ PHÒNG KHÁCH SẠN
+        // ==========================================
+        if (command === 'khachsan' || command === 'thuephong' || command === 'hotel') {
+            const embed = new EmbedBuilder()
+                .setColor('Gold')
+                .setTitle('🏨 HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN 24/7')
+                .setDescription('Thuê phòng riêng tư để nhận ngay **Danh mục, Kênh Chat và Kênh Voice độc quyền**!\n\n• **Phòng VIP:** `1.500.000đ` (Thuế: 200.000đ/giờ)\n• **Phòng Hoàng Gia:** `5.000.000đ` (Thuế: 500.000đ/giờ)\n\n*Bấm nút bên dưới để chọn phòng muốn thuê:*');
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('hotel_vip').setLabel('👑 Thuê Phòng VIP (1.5 Tr)').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('hotel_hoanggia').setLabel('🌟 Thuê Phòng Hoàng Gia (5 Tr)').setStyle(ButtonStyle.Primary)
+            );
+
+            return message.reply({ embeds: [embed], components: [row] });
+        }
+
+        // ==========================================
         // CÁC LỆNH ĐẶT CƯỢC LÔ ĐỀ & VÉ SỐ
         // ==========================================
         if (command === 'lo' || command === 'de') {
@@ -1040,7 +1174,7 @@ client.on('messageCreate', async message => {
             const resData = await processLotteryDraw(true);
             
             if (resData.sentCount === 0) {
-                return message.channel.send('⚠️️ Đã quay xong kết quả nhưng chưa có kênh nào được cài đặt bằng lệnh `!setlode`!');
+                return message.channel.send('⚠ Đã quay xong kết quả nhưng chưa có kênh nào được cài đặt bằng lệnh `!setlode`!');
             }
             return;
         }
@@ -1088,6 +1222,7 @@ client.on('messageCreate', async message => {
             loans = loadJSON(FILES.LOANS);
             cryptoMarket = loadJSON(FILES.CRYPTO, false);
             portfolios = loadJSON(FILES.PORTFOLIO);
+            hotelData = loadJSON(FILES.HOTELS, false);
 
             let replyMessage = `✅ Đã import thành công **${successCount}/${attachments.length}** file dữ liệu! Bot đã tự động nạp lại bộ nhớ RAM.`;
             if (failedFiles.length > 0) {
@@ -1460,6 +1595,11 @@ client.on('messageCreate', async message => {
                 .setTitle('📖 BẢNG HƯỚNG DẪN TOÀN BỘ LỆNH BOT')
                 .setDescription('Danh sách đầy đủ các lệnh giải trí, tài chính, giao dịch coin và cấu hình hệ thống:')
                 .addFields(
+                    { 
+                        name: '🏨 Khách Sạn 24/7', 
+                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP (1.5 Tr) hoặc Hoàng Gia (5 Tr) để tự động tạo danh mục, chat và voice riêng (Tự động thu thuế mỗi giờ)', 
+                        inline: false 
+                    },
                     { 
                         name: '💰 Tài Chính & Ngân Hàng', 
                         value: '• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại\n• `!profile` (hoặc `!pf`): Xem hồ sơ chi tiết, BXH và danh hiệu\n• `!daily`: Điểm danh nhận quà hằng ngày (100.000đ)\n• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia\n• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%, tối đa 1 Tỷ)\n• `!trano <số_tiền|all>`: Trả nợ ngân hàng', 
