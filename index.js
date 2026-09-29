@@ -1414,59 +1414,59 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'addadmin') {
-            if (userId !== ADMIN_ID) return message.reply('❌ Chỉ Owner gốc mới có quyền thêm Admin phụ!');
+            if (userId !== ADMIN_ID) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền thêm Admin!');
             const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!addadmin @user`');
+            if (!targetUser) return message.reply('<a:no:1554602168093507685> Cú pháp: `!addadmin @user`');
 
             if (targetUser.id === ADMIN_ID) {
-                return message.reply('⚠ Đây là Owner gốc rồi!');
+                return message.reply('<a:cb:1554593663567274106> Đây là Owner!');
             }
 
             if (adminList.users.includes(targetUser.id)) {
-                return message.reply(`⚠️ ${targetUser} đã có quyền Admin phụ từ trước!`);
+                return message.reply(`<a:as_warning:1554611415514357760> ${targetUser} đã có quyền Admin phụ từ trước!`);
             }
 
             adminList.users.push(targetUser.id);
             saveJSONSync(FILES.ADMINS, adminList);
-            return message.reply(`<a:yes:1554602231389487125> Đã thêm ${targetUser} vào danh sách Admin phụ thành công!`);
+            return message.reply(`<a:yes:1554602231389487125> Đã thêm ${targetUser} vào danh sách Admin thành công!`);
         }
 
         if (command === 'removeadmin' || command === 'deladmin') {
-            if (userId !== ADMIN_ID) return message.reply('❌ Chỉ Owner gốc mới có quyền gỡ Admin phụ!');
+            if (userId !== ADMIN_ID) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền gỡ Admin!');
             const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!removeadmin @user`');
+            if (!targetUser) return message.reply('<a:no:1554602168093507685> Cú pháp: `!removeadmin @user`');
 
             const index = adminList.users.indexOf(targetUser.id);
             if (index === -1) {
-                return message.reply(`⚠️️ ${targetUser} không có trong danh sách Admin phụ!`);
+                return message.reply(`<a:as_warning:1554611415514357760> ${targetUser} không có trong danh sách Admin!`);
             }
 
             adminList.users.splice(index, 1);
             saveJSONSync(FILES.ADMINS, adminList);
-            return message.reply(`<a:yes:1554602231389487125> Đã gỡ bỏ quyền Admin phụ của ${targetUser}.`);
+            return message.reply(`<a:yes:1554602231389487125> Đã gỡ bỏ quyền Admin của ${targetUser}.`);
         }
 
         if (command === 'listadmin' || command === 'admins') {
-            if (!isBotOwner(userId)) return message.reply('❌ Bạn không có quyền xem danh sách này!');
+            if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Bạn không có quyền xem danh sách này!');
             
-            let desc = `👑 **Owner Gốc:** <@${ADMIN_ID}>\n`;
+            let desc = `<a:Crown:1554608058460676167> **Owner :** <@${ADMIN_ID}>\n`;
             if (adminList.users.length > 0) {
-                desc += `🛡️ **Admin Phụ:**\n` + adminList.users.map(id => `• <@${id}>`).join('\n');
+                desc += `<:994180roleadminred:1554607509724209153> **Admin:**\n` + adminList.users.map(id => `• <@${id}>`).join('\n');
             } else {
-                desc += `🛡️ **Admin Phụ:** Chưa có ai.`;
+                desc += `<:994180roleadminred:1554607509724209153> **Admin:** Chưa có ai.`;
             }
 
             const embed = new EmbedBuilder()
                 .setColor('Gold')
-                .setTitle('👑 Danh Sách Admin BOT')
+                .setTitle('👑 Danh Sách Owner & Admin BOT')
                 .setDescription(desc);
             return message.reply({ embeds: [embed] });
         }
 
         if (command === 'addstaff') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền thêm Staff!');
+            if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền thêm Staff!');
             const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!addstaff @user`');
+            if (!targetUser) return message.reply('<a:no:1554602168093507685> Cú pháp: `!addstaff @user`');
 
             if (staffList.users.includes(targetUser.id)) {
                 return message.reply(`⚠ ${targetUser} đã có trong danh sách Staff từ trước!`);
@@ -1478,13 +1478,13 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'removestaff' || command === 'delstaff') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền xóa Staff!');
+            if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền xóa Staff!');
             const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!removestaff @user`');
+            if (!targetUser) return message.reply('<a:no:1554602168093507685> Cú pháp: `!removestaff @user`');
 
             const index = staffList.users.indexOf(targetUser.id);
             if (index === -1) {
-                return message.reply(`⚠️ ${targetUser} không có trong danh sách Staff!`);
+                return message.reply(`<a:as_warning:1554611415514357760> ${targetUser} không có trong danh sách Staff!`);
             }
 
             staffList.users.splice(index, 1);
@@ -1493,15 +1493,15 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'liststaff' || command === 'staffs') {
-            if (!isBotStaff(userId)) return message.reply('❌ Bạn không có quyền xem danh sách này!');
+            if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Bạn không có quyền xem danh sách này!');
             if (staffList.users.length === 0) {
-                return message.reply('🛡️ Danh sách Staff hiện tại đang trống.');
+                return message.reply('<:1503moderatorbadge:1554610677220511774> Danh sách Staff hiện tại đang trống.');
             }
 
             const staffMentions = staffList.users.map(id => `• <@${id}>`).join('\n');
             const embed = new EmbedBuilder()
                 .setColor('Blue')
-                .setTitle('🛡️ DANH SÁCH QUẢN TRỊ VIÊN (STAFF)')
+                .setTitle('<:1503moderatorbadge:1554610677220511774> Danh Sạch Staff')
                 .setDescription(staffMentions);
             return message.reply({ embeds: [embed] });
         }
@@ -1512,7 +1512,7 @@ client.on('messageCreate', async message => {
             if (subCmd === 'chart' || subCmd === 'bieudo') {
                 const symbol = args[1]?.toUpperCase();
                 if (!symbol || !cryptoMarket.coins[symbol]) {
-                    return message.reply('❌ Cú pháp xem biểu đồ: `!coin chart <MÃ_COIN>`\n*(VD: `!coin chart BTC`)*');
+                    return message.reply('<a:no:1554602168093507685> Cú pháp xem biểu đồ: `!coin chart <MÃ_COIN>`\n*(VD: `!coin chart BTC`)*');
                 }
 
                 const coin = cryptoMarket.coins[symbol];
@@ -1576,7 +1576,7 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'setcoin') {
-            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('❌ Bạn không có quyền cấu hình kênh!');
+            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('<a:no:1554602168093507685> Bạn không có quyền cấu hình kênh!');
             const targetChannel = message.mentions.channels.first() || message.channel;
 
             if (typeof config[guildId] !== 'object') config[guildId] = {};
@@ -1599,8 +1599,8 @@ client.on('messageCreate', async message => {
                 return message.reply({ embeds: [embed] });
             }
 
-            if (currentDebt > 0) return message.reply(`❌ Hãy trả hết khoản nợ cũ **${formatMoney(currentDebt)}** trước.`);
-            if (amount > MAX_LOAN_LIMIT) return message.reply(`❌ Vượt quá hạn ngạch tối đa **${formatMoney(MAX_LOAN_LIMIT)}**.`);
+            if (currentDebt > 0) return message.reply(`<a:no:1554602168093507685> Trả Hết Nợ Cũ Đi **${formatMoney(currentDebt)}** Rồi Vay Lại.`);
+            if (amount > MAX_LOAN_LIMIT) return message.reply(`<a:no:1554602168093507685> Vay Nhiều Quá Trả Không Nổi Đâu **${formatMoney(MAX_LOAN_LIMIT)}**.`);
 
             const totalDebtWithInterest = Math.floor(amount * (1 + LOAN_INTEREST_RATE));
             setLoan(userId, totalDebtWithInterest);
