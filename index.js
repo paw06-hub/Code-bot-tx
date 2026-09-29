@@ -93,7 +93,7 @@ if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
 if (!lotteryData.lastResult) lotteryData.lastResult = null;
 if (!Array.isArray(staffList.users)) staffList.users = [];
 if (!Array.isArray(adminList.users)) adminList.users = [];
-if (!hotelData.rooms) hotelData.rooms = {}; // Cấu trúc: { channelId: { ownerId, type, price, taxTimer } }
+if (!hotelData.rooms) hotelData.rooms = {}; // Cấu trúc: { channelId: { ownerId, type, price, guildId } }
 
 if (!cryptoMarket.coins) {
     cryptoMarket.coins = {
@@ -294,7 +294,7 @@ function scheduleHotelTaxes() {
                     channel.send(`🔔 <@${ownerId}> Đã đến hạn đóng thuế phòng khách sạn! Hệ thống đã tự động thu **-${formatMoney(taxAmount)}** phí duy trì phòng.`).catch(() => {});
                 } else {
                     // Không đủ tiền đóng thuế -> Tự động giải tán phòng
-                    channel.send(`⚠️ <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi!`).catch(() => {});
+                    channel.send(`⚠️ <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi[span_0](start_span)[span_0](end_span)!`).catch(() => {});
                     
                     const category = channel.parent;
                     if (category) {
@@ -732,7 +732,20 @@ client.on('interactionCreate', async interaction => {
                 };
                 saveJSONSync(FILES.HOTELS, hotelData);
 
-                textChannel.send(`🎉 Chào mừng <@${user.id}> đã thuê thành công **${roomInfo.name}**!\n• Giá thuê: **${formatMoney(roomInfo.price)}**\n• Thuế định kỳ mỗi giờ: **${formatMoney(roomInfo.tax)}**\n\nBạn có toàn quyền quản lý kênh chat và voice trong danh mục này.`);
+                // Gửi bảng hướng dẫn chi tiết vào phòng mới tạo
+                const guideEmbed = new EmbedBuilder()
+                    .setColor('Gold')
+                    .setTitle(`🏨 HƯỚNG DẪN SỬ DỤNG PHÒNG ${roomInfo.name.toUpperCase()}`)
+                    .setDescription(`Chào mừng <@${user.id}> đã sở hữu không gian riêng tư thành công! Dưới đây là các đặc quyền và lệnh quản lý phòng của bạn:`)
+                    .addFields(
+                        { name: '👥 Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`\n• Đuổi: `!duoi @user`', inline: true },
+                        { name: '✏️️ Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
+                        { name: '💰 Thông tin thuế & Duy trì', value: `• Giá thuê: **${formatMoney(roomInfo.price)}**\n• Phí duy trì: **${formatMoney(roomInfo.tax)} / giờ** (Trừ tự động vào ví).`, inline: false },
+                        { name: '⚠️ Lưu ý', value: 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng sẽ tự động bị thu hồi[span_1](start_span)[span_1](end_span)!', inline: false }
+                    )
+                    .setTimestamp();
+
+                await textChannel.send({ content: `🎉 Chủ nhân <@${user.id}> đã nhận phòng thành công!`, embeds: [guideEmbed] });
 
                 return interaction.editReply({ content: `✅ Thuê phòng thành công! Kênh riêng của bạn đã được khởi tạo tại danh mục mới.` });
             } catch (err) {
@@ -1113,6 +1126,137 @@ client.on('messageCreate', async message => {
         }
 
         // ==========================================
+        // CÁC LỆNH QUẢN LÝ PHÒNG KHÁCH SẠN (!moi, !duoi, !doiten, !khoa, !mokhoa)
+        // ==========================================
+        
+        // 1. LỆNH MỜI THÀNH VIÊN VÀO PHÒNG (!moi)
+        if (command === 'moi') {
+            const roomInfo = hotelData.rooms[message.channel.id];
+            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền mời người khác!');
+
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Cú pháp: `!moi @user`');
+            if (targetUser.id === userId) return message.reply('⚠️ Bạn chính là chủ phòng rồi mà!');
+
+            try {
+                await message.channel.permissionOverwrites.create(targetUser.id, {
+                    ViewChannel: true,
+                    SendMessages: true,
+                    ReadMessageHistory: true
+                });
+
+                const category = message.channel.parent;
+                if (category) {
+                    for (const child of category.children.cache.values()) {
+                        if (child.type === ChannelType.GuildVoice) {
+                            await child.permissionOverwrites.create(targetUser.id, {
+                                ViewChannel: true,
+                                Connect: true,
+                                Speak: true
+                            });
+                        }
+                    }
+                }
+                return message.reply(`✅ Đã mời thành công ${targetUser} vào phòng khách sạn của bạn!`);
+            } catch (err) {
+                console.error('[Room Invite Error]:', err);
+                return message.reply('❌ Có lỗi xảy ra khi cấp quyền cho thành viên.');
+            }
+        }
+
+        // 2. LỆNH ĐUỔI THÀNH VIÊN KHỎI PHÒNG (!duoi)
+        if (command === 'duoi') {
+            const roomInfo = hotelData.rooms[message.channel.id];
+            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền đuổi người khác!');
+
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) return message.reply('❌ Cú pháp: `!duoi @user`');
+            if (targetUser.id === userId || targetUser.id === roomInfo.ownerId) return message.reply('⚠️ Không thể tự đuổi chính mình hoặc chủ phòng!');
+
+            try {
+                await message.channel.permissionOverwrites.delete(targetUser.id);
+                const category = message.channel.parent;
+                if (category) {
+                    for (const child of category.children.cache.values()) {
+                        await child.permissionOverwrites.delete(targetUser.id).catch(() => {});
+                        if (child.type === ChannelType.GuildVoice) {
+                            const member = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                            if (member && member.voice.channelId === child.id) {
+                                await member.voice.disconnect().catch(() => {});
+                            }
+                        }
+                    }
+                }
+                return message.reply(`✅ Đã thu hồi quyền và đuổi ${targetUser} khỏi phòng thành công!`);
+            } catch (err) {
+                console.error('[Room Kick Error]:', err);
+                return message.reply('❌ Có lỗi xảy ra khi tước quyền thành viên.');
+            }
+        }
+
+        // 3. LỆNH ĐỔI TÊN PHÒNG (!doiten)
+        if (command === 'doiten') {
+            const roomInfo = hotelData.rooms[message.channel.id];
+            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền đổi tên phòng!');
+
+            const newName = args.join(' ');
+            if (!newName) return message.reply('❌ Vui lòng nhập tên mới cho phòng! Cú pháp: `!doiten <tên_phòng_mới>`');
+            if (newName.length > 30) return message.reply('⚠️ Tên phòng quá dài, vui lòng đặt dưới 30 ký tự!');
+
+            try {
+                await message.channel.setName(newName);
+                const category = message.channel.parent;
+                if (category) {
+                    for (const child of category.children.cache.values()) {
+                        if (child.type === ChannelType.GuildVoice) {
+                            await child.setName(`🔊 ${newName}`).catch(() => {});
+                        }
+                    }
+                }
+                return message.reply(`✅ Đã đổi tên phòng khách sạn thành công thành: **${newName}**!`);
+            } catch (err) {
+                console.error('[Room Rename Error]:', err);
+                return message.reply('❌ Có lỗi xảy ra khi đổi tên phòng (Discord giới hạn số lần đổi tên kênh, hãy thử lại sau ít phút).');
+            }
+        }
+
+        // 4. LỆNH KHÓA / MỞ KHÓA PHÒNG (!khoa / !mokhoa)
+        if (command === 'khoa' || command === 'mokhoa') {
+            const roomInfo = hotelData.rooms[message.channel.id];
+            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền khóa/mở khóa phòng!');
+
+            const isLock = command === 'khoa';
+            const category = message.channel.parent;
+
+            try {
+                const overwriteOptions = {
+                    ViewChannel: isLock ? false : true,
+                    Connect: isLock ? false : true
+                };
+
+                await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, overwriteOptions);
+                if (category) {
+                    for (const child of category.children.cache.values()) {
+                        await child.permissionOverwrites.edit(message.guild.roles.everyone, overwriteOptions).catch(() => {});
+                    }
+                }
+
+                if (isLock) {
+                    return message.reply('🔒 Đã **khóa phòng** thành công! Người ngoài sẽ không thể nhìn thấy hoặc tự ý vào phòng của bạn nữa.');
+                } else {
+                    return message.reply('🔓 Đã **mở khóa phòng** thành công! Mọi người có thể tự do ghé thăm phòng của bạn.');
+                }
+            } catch (err) {
+                console.error('[Room Lock/Unlock Error]:', err);
+                return message.reply('❌ Có lỗi xảy ra khi thay đổi trạng thái khóa phòng.');
+            }
+        }
+
+        // ==========================================
         // CÁC LỆNH ĐẶT CƯỢC LÔ ĐỀ & VÉ SỐ
         // ==========================================
         if (command === 'lo' || command === 'de') {
@@ -1238,7 +1382,7 @@ client.on('messageCreate', async message => {
             if (!targetUser) return message.reply('❌ Cú pháp: `!addadmin @user`');
 
             if (targetUser.id === ADMIN_ID) {
-                return message.reply('⚠️ Đây là Owner gốc rồi!');
+                return message.reply('⚠️️ Đây là Owner gốc rồi!');
             }
 
             if (adminList.users.includes(targetUser.id)) {
@@ -1288,7 +1432,7 @@ client.on('messageCreate', async message => {
             if (!targetUser) return message.reply('❌ Cú pháp: `!addstaff @user`');
 
             if (staffList.users.includes(targetUser.id)) {
-                return message.reply(`⚠️ ${targetUser} đã có trong danh sách Staff từ trước!`);
+                return message.reply(`⚠️️ ${targetUser} đã có trong danh sách Staff từ trước!`);
             }
 
             staffList.users.push(targetUser.id);
@@ -1509,7 +1653,7 @@ client.on('messageCreate', async message => {
                     balances.set(uId, 50000); 
                 }
                 saveJSONSync(FILES.BALANCES, balances);
-                return message.reply('⚠️ **Đã reset số dư của TOÀN BỘ thành viên trong server về mức khởi điểm (50.000đ)!**');
+                return message.reply('⚠️️ **Đã reset số dư của TOÀN BỘ thành viên trong server về mức khởi điểm (50.000đ)!**');
             }
 
             setBalance(targetUser.id, 50000); 
@@ -1597,7 +1741,7 @@ client.on('messageCreate', async message => {
                 .addFields(
                     { 
                         name: '🏨 Khách Sạn 24/7', 
-                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP (1.5 Tr) hoặc Hoàng Gia (5 Tr) để tự động tạo danh mục, chat và voice riêng (Tự động thu thuế mỗi giờ)', 
+                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP (1.5 Tr) hoặc Hoàng Gia (5 Tr) để tự động tạo danh mục, chat và voice riêng (Tự động thu thuế mỗi giờ)\n• `!moi @user`: Mời bạn vào phòng khách sạn của bạn\n• `!duoi @user`: Đuổi thành viên khỏi phòng khách sạn\n• `!doiten <tên_mới>`: Đổi tên phòng khách sạn\n• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng', 
                         inline: false 
                     },
                     { 
