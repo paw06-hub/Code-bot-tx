@@ -936,8 +936,8 @@ client.on('interactionCreate', async interaction => {
                     .setColor('DarkGreen')
                     .setTitle(`🃏 BLACKJACK - ${user.username}`)
                     .addFields(
-                        { name: '@Paw162', value: `${formatHand(game.dealerHand, true)} (?? điểm)` },
-                        { name: 'Bạn', value: `${formatHand(game.playerHand)} (${playerScore} điểm)` }
+                        { name: '<a:vuongmiendo:1554622871882436710> @Paw162', value: `${formatHand(game.dealerHand, true)} (?? điểm)` },
+                        { name: '<:Members:1554622922629451828> Bạn', value: `${formatHand(game.playerHand)} (${playerScore} điểm)` }
                     )
                     .setFooter({ text: `Tiền cược: ${formatMoney(game.bet)}` });
 
@@ -1560,7 +1560,7 @@ client.on('messageCreate', async message => {
 
             let marketText = '';
             for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
-                const trendEmoji = coin.change > 0 ? '🟢 ▲' : (coin.change < 0 ? '🔴 ▼' : '🟡 ➖');
+                const trendEmoji = coin.change > 0 ? '<:stonks:1554601546820493472> ▲' : (coin.change < 0 ? '<:notstonks:1554601468810756266> ▼' : '🟡 ➖');
                 const sign = coin.change > 0 ? '+' : '';
                 marketText += `${trendEmoji} **${coin.name} (${symbol})**: **${formatMoney(coin.price)}** (${sign}${coin.change}%)\n`;
             }
@@ -1758,13 +1758,13 @@ client.on('messageCreate', async message => {
                 .setColor('DarkGreen')
                 .setTitle(`🃏 BLACKJACK - ${message.author.username}`)
                 .addFields(
-                    { name: '🤖 Nhà Cái', value: `${formatHand(dealerHand, true)} (?? điểm)` },
-                    { name: '👤 Bạn', value: `${formatHand(playerHand)} (${playerScore} điểm)` }
+                    { name: '<a:vuongmiendo:1554622871882436710> @Paw162', value: `${formatHand(dealerHand, true)} (?? điểm)` },
+                    { name: '<:Members:1554622922629451828> Bạn', value: `${formatHand(playerHand)} (${playerScore} điểm)` }
                 );
 
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('bj_hit').setLabel('🃏 RÚT').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('bj_stand').setLabel('🛑 DẰN').setStyle(ButtonStyle.Danger)
+                new ButtonBuilder().setCustomId('bj_hit').setLabel('<:VoteYes:1554627655507247104> RÚT').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('bj_stand').setLabel('<:yes:1554627811317383258> DẰN').setStyle(ButtonStyle.Danger)
             );
 
             return message.reply({ embeds: [embed], components: [row] });
