@@ -942,8 +942,8 @@ client.on('interactionCreate', async interaction => {
                     .setFooter({ text: `Tiền cược: ${formatMoney(game.bet)}` });
 
                 const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('bj_hit').setLabel('<:VoteYes:1554638419626303619> RÚT (HIT)').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId('bj_stand').setLabel('<:yes:1554638549251526717> DẰN (STAND)').setStyle(ButtonStyle.Danger)
+                    new ButtonBuilder().setCustomId('bj_hit').setLabel('RÚT').setEmoji('1554638419626303619').setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId('bj_stand').setLabel('DẰN').setEmoji('1554638549251526717').setStyle(ButtonStyle.Danger)
                 );
 
                 return interaction.update({ embeds: [embed], components: [row] });
@@ -1763,8 +1763,8 @@ client.on('messageCreate', async message => {
                 );
 
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('bj_hit').setLabel('<:VoteYes:1554638419626303619> RÚT').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('bj_stand').setLabel('<:yes:1554638549251526717> DẰN').setStyle(ButtonStyle.Danger)
+                new ButtonBuilder().setCustomId('bj_hit').setLabel('RÚT').setEmoji('1554638419626303619').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('bj_stand').setLabel('DẰN').setEmoji('1554638549251526717').setStyle(ButtonStyle.Danger)
             );
 
             return message.reply({ embeds: [embed], components: [row] });
