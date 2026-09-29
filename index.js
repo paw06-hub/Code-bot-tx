@@ -1097,7 +1097,7 @@ client.on('messageCreate', async message => {
         const REWARD = 5000;
         setBalance(userId, getBalance(userId) + REWARD);
 
-        await message.react('✅');
+        await message.react('<a:Verify:1554597525640585328>');
         startWordGameTimeout(guildId, message.channel);
         return;
     }
