@@ -286,14 +286,12 @@ function scheduleHotelTaxes() {
             const channel = guild.channels.cache.get(channelId);
             const ownerId = room.ownerId;
             const taxAmount = HOTEL_PRICES[room.type]?.tax || 200000;
-            const roomTypeName = HOTEL_PRICES[room.type]?.name || 'Phòng Khách Sạn';
 
             if (channel) {
                 const bal = getBalance(ownerId);
                 if (bal >= taxAmount) {
                     setBalance(ownerId, bal - taxAmount);
-                    // Áp dụng thông báo thu thuế khách sạn yêu cầu
-                    channel.send(`<a:money_sign:1554589693067264064> **THUẾ PHÒNG KHÁCH SẠN**\nĐã đến giờ đóng thuế định kỳ cho phòng **${roomTypeName}**, số tiền cần đóng là **${formatMoney(taxAmount)}** VNĐ. (Đã tự động trừ ví <@${ownerId}>)`).catch(() => {});
+                    channel.send(`🔔 <@${ownerId}> Đã đến hạn đóng thuế phòng khách sạn! Hệ thống đã tự động thu **-${formatMoney(taxAmount)}** phí duy trì phòng.`).catch(() => {});
                 } else {
                     channel.send(`⚠️ <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi[span_1](start_span)[span_1](end_span)!`).catch(() => {});
                     
@@ -351,8 +349,7 @@ const startWordGameTimeout = (guildId, channel) => {
         session.usedWords = new Set([newWord]);
         session.timeoutId = null;
 
-        // Áp dụng thông báo Nối từ theo yêu cầu
-        await channel.send(`<a:emoji_11:1554594850605899887> Bạn có 30 giây để nối từ tiếp theo bắt đầu bằng chữ: **"${newWord}"**!${penaltyMsg}`).catch(() => {});
+        await channel.send(`⏳ **Đã quá 3 phút không có ai nối từ!**${penaltyMsg}\n🔄 **Bắt đầu ván mới với từ:** **"${newWord}"**`).catch(() => {});
     }, 180000);
 };
 
@@ -460,9 +457,7 @@ async function processLotteryDraw(isManual = false) {
     saveJSONSync(FILES.LOTTERY, lotteryData);
 
     const titleText = isManual ? '🎰 KẾT QUẢ XỔ SỐ & LÔ ĐỀ (QUAY THỦ CÔNG)' : '🎰 KẾT QUẢ XỔ SỐ & LÔ ĐỀ HÔM NAY (18:00)';
-    
-    // Sử dụng thông báo kết quả xổ số yêu cầu
-    const headerMsg = `<:emoji_8:1554594824739360869> **KẾT QUẢ XỔ SỐ HÔM NAY**\nChúc mừng các con số may mắn đã nổ trong ngày hôm nay! Hãy kiểm tra vé số của bạn ngay.`;
+    const headerMsg = isManual ? '⚡ **THÔNG BÁO: QUAY THƯỞNG XỔ SỐ THEO YÊU CẦU AD!**' : '🔔 **ĐÃ ĐẾN GIỜ QUAY THƯỞNG XỔ SỐ THƯỜNG NIÊN (18:00)!**';
 
     const embed = new EmbedBuilder()
         .setColor('Red')
@@ -600,8 +595,7 @@ async function startTaiXiuLoop(guildId, channelId) {
             new ButtonBuilder().setCustomId('bet_xiu').setLabel('🔵 CƯỢC XỈU').setStyle(ButtonStyle.Primary)
         );
 
-        // Đính kèm thông báo bảng kết quả tài xỉu
-        const openMsg = await channel.send({ content: `<:emoji_8:1554594813402161252> **BẢNG KẾT QUẢ TÀI XỈU**`, embeds: [embedOpen], components: [row] }).catch(() => null);
+        const openMsg = await channel.send({ embeds: [embedOpen], components: [row] }).catch(() => null);
         if (openMsg) txSession.lastOpenMessage = openMsg;
 
         await new Promise(res => setTimeout(res, 40000));
@@ -728,7 +722,7 @@ client.on('interactionCreate', async interaction => {
                     parent: category.id
                 });
 
-                // Lưu thông tin phòng vào hệ thống
+                // Lưu thông tin phòng vào hệ thống (Đã lưu kèm theo price gốc để hoàn tiền sau này)
                 hotelData.rooms[textChannel.id] = {
                     guildId: guildId,
                     ownerId: user.id,
@@ -737,9 +731,7 @@ client.on('interactionCreate', async interaction => {
                 };
                 saveJSONSync(FILES.HOTELS, hotelData);
 
-                // Gửi thông báo thuê phòng thành công
-                const successNotice = `<:emoji_8:1554594801972678726> **THUÊ PHÒNG THÀNH CÔNG!**\nChúc mừng bạn đã sở hữu phòng **${roomInfo.name}** với giá **${formatMoney(roomInfo.price)}** VNĐ!`;
-
+                // Gửi bảng hướng dẫn chi tiết vào phòng mới tạo
                 const guideEmbed = new EmbedBuilder()
                     .setColor('Gold')
                     .setTitle(`🏨 HƯỚNG DẪN SỬ DỤNG PHÒNG ${roomInfo.name.toUpperCase()}`)
@@ -747,13 +739,13 @@ client.on('interactionCreate', async interaction => {
                     .addFields(
                         { name: '👥 Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`\n• Đuổi: `!duoi @user`', inline: true },
                         { name: '✏ Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
-                        { name: '🚪 Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng và nhận lại 50% tiền VNĐ**.', inline: false },
+                        { name: '🚪 Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng và nhận lại 50% tiền VNĐ**[span_2](start_span)[span_2](end_span).', inline: false },
                         { name: '💰 Thông tin thuế & Duy trì', value: `• Giá thuê: **${formatMoney(roomInfo.price)}**\n• Phí duy trì: **${formatMoney(roomInfo.tax)} / giờ** (Trừ tự động vào ví).`, inline: false },
-                        { name: '⚠️ Lưu ý', value: 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng sẽ tự động bị thu hồi!', inline: false }
+                        { name: '⚠️ Lưu ý', value: 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng sẽ tự động bị thu hồi[span_3](start_span)[span_3](end_span)!', inline: false }
                     )
                     .setTimestamp();
 
-                await textChannel.send({ content: successNotice, embeds: [guideEmbed] });
+                await textChannel.send({ content: `🎉 Chủ nhân <@${user.id}> đã nhận phòng thành công!`, embeds: [guideEmbed] });
 
                 return interaction.editReply({ content: `✅ Thuê phòng thành công! Kênh riêng của bạn đã được khởi tạo tại danh mục mới.` });
             } catch (err) {
@@ -1137,6 +1129,7 @@ client.on('messageCreate', async message => {
         // CÁC LỆNH QUẢN LÝ PHÒNG KHÁCH SẠN (!moi, !duoi, !doiten, !khoa, !mokhoa, !traphong)
         // ==========================================
         
+        // 1. LỆNH MỜI THÀNH VIÊN VÀO PHÒNG (!moi)
         if (command === 'moi') {
             const roomInfo = hotelData.rooms[message.channel.id];
             if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
@@ -1172,6 +1165,7 @@ client.on('messageCreate', async message => {
             }
         }
 
+        // 2. LỆNH ĐUỔI THÀNH VIÊN KHỎI PHÒNG (!duoi)
         if (command === 'duoi') {
             const roomInfo = hotelData.rooms[message.channel.id];
             if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
@@ -1202,6 +1196,7 @@ client.on('messageCreate', async message => {
             }
         }
 
+        // 3. LỆNH ĐỔI TÊN PHÒNG (!doiten)
         if (command === 'doiten') {
             const roomInfo = hotelData.rooms[message.channel.id];
             if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
@@ -1224,10 +1219,11 @@ client.on('messageCreate', async message => {
                 return message.reply(`✅ Đã đổi tên phòng khách sạn thành công thành: **${newName}**!`);
             } catch (err) {
                 console.error('[Room Rename Error]:', err);
-                return message.reply('❌ Có lỗi xảy ra khi đổi tên phòng.');
+                return message.reply('❌ Có lỗi xảy ra khi đổi tên phòng (Discord giới hạn số lần đổi tên kênh, hãy thử lại sau ít phút).');
             }
         }
 
+        // 4. LỆNH KHÓA / MỞ KHÓA PHÒNG (!khoa / !mokhoa)
         if (command === 'khoa' || command === 'mokhoa') {
             const roomInfo = hotelData.rooms[message.channel.id];
             if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
@@ -1260,18 +1256,22 @@ client.on('messageCreate', async message => {
             }
         }
 
+        // 5. LỆNH TRẢ PHÒNG VÀ HOÀN 50% TIỀN VNĐ (!traphong / !checkout)
         if (command === 'traphong' || command === 'checkout') {
             const roomInfo = hotelData.rooms[message.channel.id];
             if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn**!');
             if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền trả phòng!');
 
+            // Tính 50% tiền hoàn lại dựa trên giá phòng đã thuê
             const refundAmount = Math.floor(roomInfo.price * 0.5);
             const currentBal = getBalance(roomInfo.ownerId);
 
+            // Cộng lại tiền vào ví chủ phòng
             setBalance(roomInfo.ownerId, currentBal + refundAmount);
 
             await message.reply(`✅ Bạn đã tiến hành trả phòng thành công! Hệ thống đã hoàn lại **+${formatMoney(refundAmount)}** (50% giá trị phòng) vào ví của <@${roomInfo.ownerId}>. Danh mục phòng sẽ được xóa sau 3 giây...`);
 
+            // Xóa toàn bộ kênh và danh mục phòng sau 3 giây
             setTimeout(async () => {
                 try {
                     const category = message.channel.parent;
@@ -1347,6 +1347,7 @@ client.on('messageCreate', async message => {
             return message.reply(`🎫 Đã mua thành công vé số **${num}** với giá **${formatMoney(TICKET_PRICE)}**! Trúng Giải Đặc Biệt nhận ngay **100.000.000đ**!`);
         }
 
+        // LỆNH ÉP BOT RA KẾT QUẢ SỔ XỐ / LÔ ĐỀ NGAY
         if (['kqsx', 'quayso', 'eplode'].includes(command)) {
             if (!isBotStaff(userId)) return message.reply('❌ Bạn không có quyền ép quay số!');
             
@@ -1383,7 +1384,7 @@ client.on('messageCreate', async message => {
                         fs.writeFileSync(targetPath, response.data, 'utf8');
                         successCount++;
                     } catch (e) {
-                        console.error(`[Import Error]:`, e.message);
+                        console.error(`[Import Error cho file ${fileName}]:`, e.message);
                         failedFiles.push(fileName);
                     }
                 } else {
@@ -1417,8 +1418,13 @@ client.on('messageCreate', async message => {
             const targetUser = message.mentions.users.first();
             if (!targetUser) return message.reply('❌ Cú pháp: `!addadmin @user`');
 
-            if (targetUser.id === ADMIN_ID) return message.reply('⚠ Đây là Owner gốc rồi!');
-            if (adminList.users.includes(targetUser.id)) return message.reply(`⚠️ ${targetUser} đã có quyền Admin phụ từ trước!`);
+            if (targetUser.id === ADMIN_ID) {
+                return message.reply('⚠ Đây là Owner gốc rồi!');
+            }
+
+            if (adminList.users.includes(targetUser.id)) {
+                return message.reply(`⚠️ ${targetUser} đã có quyền Admin phụ từ trước!`);
+            }
 
             adminList.users.push(targetUser.id);
             saveJSONSync(FILES.ADMINS, adminList);
@@ -1431,7 +1437,9 @@ client.on('messageCreate', async message => {
             if (!targetUser) return message.reply('❌ Cú pháp: `!removeadmin @user`');
 
             const index = adminList.users.indexOf(targetUser.id);
-            if (index === -1) return message.reply(`⚠ ${targetUser} không có trong danh sách Admin phụ!`);
+            if (index === -1) {
+                return message.reply(`⚠️️ ${targetUser} không có trong danh sách Admin phụ!`);
+            }
 
             adminList.users.splice(index, 1);
             saveJSONSync(FILES.ADMINS, adminList);
@@ -1460,7 +1468,9 @@ client.on('messageCreate', async message => {
             const targetUser = message.mentions.users.first();
             if (!targetUser) return message.reply('❌ Cú pháp: `!addstaff @user`');
 
-            if (staffList.users.includes(targetUser.id)) return message.reply(`⚠ ${targetUser} đã có trong danh sách Staff từ trước!`);
+            if (staffList.users.includes(targetUser.id)) {
+                return message.reply(`⚠ ${targetUser} đã có trong danh sách Staff từ trước!`);
+            }
 
             staffList.users.push(targetUser.id);
             saveJSONSync(FILES.STAFFS, staffList);
@@ -1473,7 +1483,9 @@ client.on('messageCreate', async message => {
             if (!targetUser) return message.reply('❌ Cú pháp: `!removestaff @user`');
 
             const index = staffList.users.indexOf(targetUser.id);
-            if (index === -1) return message.reply(`⚠️ ${targetUser} không có trong danh sách Staff!`);
+            if (index === -1) {
+                return message.reply(`⚠️ ${targetUser} không có trong danh sách Staff!`);
+            }
 
             staffList.users.splice(index, 1);
             saveJSONSync(FILES.STAFFS, staffList);
@@ -1482,7 +1494,9 @@ client.on('messageCreate', async message => {
 
         if (command === 'liststaff' || command === 'staffs') {
             if (!isBotStaff(userId)) return message.reply('❌ Bạn không có quyền xem danh sách này!');
-            if (staffList.users.length === 0) return message.reply('🛡️ Danh sách Staff hiện tại đang trống.');
+            if (staffList.users.length === 0) {
+                return message.reply('🛡️ Danh sách Staff hiện tại đang trống.');
+            }
 
             const staffMentions = staffList.users.map(id => `• <@${id}>`).join('\n');
             const embed = new EmbedBuilder()
@@ -1519,7 +1533,7 @@ client.on('messageCreate', async message => {
                 const ownedKeys = Object.keys(portfolio);
 
                 if (ownedKeys.length === 0) {
-                    return message.reply('💼 Danh mục đầu tư của bạn đang trống.');
+                    return message.reply('💼 Danh mục đầu tư của bạn đang trống. Hãy dùng nút bên dưới hoặc lệnh `!coin` để mua!');
                 }
 
                 let desc = '';
@@ -1548,15 +1562,13 @@ client.on('messageCreate', async message => {
             for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
                 const trendEmoji = coin.change > 0 ? '🟢 ▲' : (coin.change < 0 ? '🔴 ▼' : '🟡 ➖');
                 const sign = coin.change > 0 ? '+' : '';
-                // Thêm mẫu thông báo biến động và giá trị hiện tại theo yêu cầu
                 marketText += `${trendEmoji} **${coin.name} (${symbol})**: **${formatMoney(coin.price)}** (${sign}${coin.change}%)\n`;
             }
 
-            // Áp dụng định dạng cập nhật thị trường theo yêu cầu
             const embedMarket = new EmbedBuilder()
                 .setColor('Blurple')
-                .setTitle('<:rate:1554591482617266207> CẬP NHẬT THỊ TRƯỜNG')
-                .setDescription(`*Chọn các nút bên dưới để thực hiện nhanh thao tác (Mua, Bán, Xem biểu đồ, Xem ví).*:\n\n<a:emoji_5:1554592992008867930> Biến động trong 24h qua và giá trị các mã coin:\n\n${marketText}`);
+                .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO')
+                .setDescription(`*Chọn các nút bên dưới để thực hiện nhanh thao tác (Mua, Bán, Xem biểu đồ, Xem ví).*:\n\n${marketText}`);
 
             const row = getCrypto4ButtonsRow();
 
@@ -1574,15 +1586,15 @@ client.on('messageCreate', async message => {
             return message.reply(`✅ Đã thiết lập kênh thông báo biến động Crypto tự động tại ${targetChannel}.`);
         }
 
+        // LỆNH VAY TIỀN NGÂN HÀNG (SỬ DỤNG HẠN MỨC 1 TỶ)
         if (command === 'vay' || command === 'vaytien') {
             const amount = parseInt(args[0], 10);
             const currentDebt = getLoan(userId);
 
             if (isNaN(amount) || amount <= 0) {
-                // Áp dụng thông báo hạ mức vay vốn ngân hàng theo yêu cầu
                 const embed = new EmbedBuilder()
                     .setColor('Yellow')
-                    .setTitle('<:bank:1554590168638427236> HẠ MỨC VAY VỐN NGÂN HÀNG')
+                    .setTitle('🏦 NGÂN HÀNG DISCORD - THÔNG TIN VAY')
                     .setDescription(`• Lãi suất cố định: **${LOAN_INTEREST_RATE * 100}%**\n• Hạn ngạch tối đa: **${formatMoney(MAX_LOAN_LIMIT)}**\n• Nợ hiện tại của bạn: **${formatMoney(currentDebt)}**`);
                 return message.reply({ embeds: [embed] });
             }
@@ -1594,8 +1606,7 @@ client.on('messageCreate', async message => {
             setLoan(userId, totalDebtWithInterest);
             setBalance(userId, getBalance(userId) + amount);
 
-            // Áp dụng thông báo vay thành công theo yêu cầu
-            return message.reply(`<:cardb:1554590864070811731> Bạn đã vay thành công số tiền **${formatMoney(amount)}** VNĐ. Lãi suất sẽ được tính dựa trên thời gian thực.`);
+            return message.reply(`✅ Vay thành công **+${formatMoney(amount)}**. Tổng nợ cần trả: **${formatMoney(totalDebtWithInterest)}**.`);
         }
 
         if (command === 'trano' || command === 'payloan') {
@@ -1627,7 +1638,7 @@ client.on('messageCreate', async message => {
                         const raw = fs.readFileSync(filePath, 'utf8');
                         allData[key] = JSON.parse(raw);
                     } catch (e) {
-                        console.error(`[Export Read Error]:`, e.message);
+                        console.error(`[Export Read Error] ${filePath}:`, e.message);
                     }
                 }
             }
@@ -1743,11 +1754,9 @@ client.on('messageCreate', async message => {
             bjGames.set(gameKey, { user: message.author, bet, deck, playerHand, dealerHand, timeout });
 
             const playerScore = calculateHand(playerHand);
-            // Áp dụng bàn chơi Blackjack yêu cầu
             const embed = new EmbedBuilder()
                 .setColor('DarkGreen')
-                .setTitle('<a:emoji_38:1554595487137665085> BÀN CHƠI BLACKJACK')
-                .setDescription(`Người chơi: **${message.author.username}**`)
+                .setTitle(`🃏 BLACKJACK - ${message.author.username}`)
                 .addFields(
                     { name: '🤖 Nhà Cái', value: `${formatHand(dealerHand, true)} (?? điểm)` },
                     { name: '👤 Bạn', value: `${formatHand(playerHand)} (${playerScore} điểm)` }
@@ -1769,7 +1778,7 @@ client.on('messageCreate', async message => {
                 .addFields(
                     { 
                         name: '🏨 Khách Sạn 24/7', 
-                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP (1.5 Tr) hoặc Hoàng Gia (5 Tr)\n• `!moi @user`: Mời bạn vào phòng khách sạn của bạn\n• `!duoi @user`: Đuổi thành viên khỏi phòng khách sạn\n• `!doiten <tên_mới>`: Đổi tên phòng khách sạn\n• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng\n• `!traphong` (hoặc `!checkout`): Trả phòng và nhận lại **50% tiền VNĐ** vào ví', 
+                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP (1.5 Tr) hoặc Hoàng Gia (5 Tr)\n• `!moi @user`: Mời bạn vào phòng khách sạn của bạn\n• `!duoi @user`: Đuổi thành viên khỏi phòng khách sạn\n• `!doiten <tên_mới>`: Đổi tên phòng khách sạn\n• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng\n• `!traphong` (hoặc `!checkout`): Trả phòng và nhận lại **50% tiền VNĐ** vào ví[span_4](start_span)[span_4](end_span)', 
                         inline: false 
                     },
                     { 
