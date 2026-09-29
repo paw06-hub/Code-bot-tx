@@ -1192,19 +1192,19 @@ client.on('messageCreate', async message => {
                 return message.reply(`<a:yes:1554602231389487125> Đã thu hồi quyền và đuổi ${targetUser} khỏi phòng thành công!`);
             } catch (err) {
                 console.error('[Room Kick Error]:', err);
-                return message.reply('❌ Có lỗi xảy ra khi tước quyền thành viên.');
+                return message.reply('<a:no:1554602168093507685> Có lỗi xảy ra khi tước quyền thành viên.');
             }
         }
 
         // 3. LỆNH ĐỔI TÊN PHÒNG (!doiten)
         if (command === 'doiten') {
             const roomInfo = hotelData.rooms[message.channel.id];
-            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
-            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền đổi tên phòng!');
+            if (!roomInfo) return message.reply('<a:no:1554602168093507685> Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Chỉ có **chủ phòng** mới có quyền đổi tên phòng!');
 
             const newName = args.join(' ');
-            if (!newName) return message.reply('❌ Vui lòng nhập tên mới cho phòng! Cú pháp: `!doiten <tên_phòng_mới>`');
-            if (newName.length > 30) return message.reply('⚠️ Tên phòng quá dài, vui lòng đặt dưới 30 ký tự!');
+            if (!newName) return message.reply('<a:no:1554602168093507685> Vui lòng nhập tên mới cho phòng! Cú pháp: `!doiten <tên_phòng_mới>`');
+            if (newName.length > 30) return message.reply('<a:as_warning:1554611415514357760> Tên phòng quá dài, vui lòng đặt dưới 30 ký tự!');
 
             try {
                 await message.channel.setName(newName);
@@ -1219,15 +1219,15 @@ client.on('messageCreate', async message => {
                 return message.reply(`<a:yes:1554602231389487125> Đã đổi tên phòng khách sạn thành công thành: **${newName}**!`);
             } catch (err) {
                 console.error('[Room Rename Error]:', err);
-                return message.reply('❌ Có lỗi xảy ra khi đổi tên phòng (Discord giới hạn số lần đổi tên kênh, hãy thử lại sau ít phút).');
+                return message.reply('<a:no:1554602168093507685> Có lỗi xảy ra khi đổi tên phòng (Discord giới hạn số lần đổi tên kênh, hãy thử lại sau ít phút).');
             }
         }
 
         // 4. LỆNH KHÓA / MỞ KHÓA PHÒNG (!khoa / !mokhoa)
         if (command === 'khoa' || command === 'mokhoa') {
             const roomInfo = hotelData.rooms[message.channel.id];
-            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
-            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền khóa/mở khóa phòng!');
+            if (!roomInfo) return message.reply('<a:no:1554602168093507685> Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Chỉ có **chủ phòng** mới có quyền khóa/mở khóa phòng!');
 
             const isLock = command === 'khoa';
             const category = message.channel.parent;
@@ -1252,15 +1252,15 @@ client.on('messageCreate', async message => {
                 }
             } catch (err) {
                 console.error('[Room Lock/Unlock Error]:', err);
-                return message.reply('❌ Có lỗi xảy ra khi thay đổi trạng thái khóa phòng.');
+                return message.reply('<a:no:1554602168093507685> Có lỗi xảy ra khi thay đổi trạng thái khóa phòng.');
             }
         }
 
         // 5. LỆNH TRẢ PHÒNG VÀ HOÀN 50% TIỀN VNĐ (!traphong / !checkout)
         if (command === 'traphong' || command === 'checkout') {
             const roomInfo = hotelData.rooms[message.channel.id];
-            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn**!');
-            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền trả phòng!');
+            if (!roomInfo) return message.reply('<a:no:1554602168093507685> Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn**!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Chỉ có **chủ phòng** mới có quyền trả phòng!');
 
             // Tính 50% tiền hoàn lại dựa trên giá phòng đã thuê
             const refundAmount = Math.floor(roomInfo.price * 0.5);
@@ -1301,12 +1301,12 @@ client.on('messageCreate', async message => {
             const bet = parseInt(args[1], 10);
 
             if (!num || !/^\d{2}$/.exec(num) || isNaN(bet) || bet <= 0) {
-                return message.reply(`❌ Cú pháp: \`!${command} <số_2_chữ_số> <tiền_cược>\`\n*(VD: \`!${command} 68 50000\`)*`);
+                return message.reply(`<a:no:1554602168093507685> Cú pháp: \`!${command} <số_2_chữ_số> <tiền_cược>\`\n*(VD: \`!${command} 68 50000\`)*`);
             }
 
             const bal = getBalance(userId);
             if (bet > bal) {
-                return message.reply(`❌ Số dư ví không đủ! Bạn hiện có **${formatMoney(bal)}**.`);
+                return message.reply(`<a:no:1554602168093507685> Số dư ví không đủ! Bạn hiện có **${formatMoney(bal)}**.`);
             }
 
             setBalance(userId, bal - bet);
@@ -1329,12 +1329,12 @@ client.on('messageCreate', async message => {
             if (!num) {
                 num = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
             } else if (!/^\d{6}$/.exec(num)) {
-                return message.reply('❌ Vé số phải có đủ **6 chữ số** (VD: `!veso 123456` hoặc gõ `!veso` để mua ngẫu nhiên).');
+                return message.reply('<a:no:1554602168093507685> Vé số phải có đủ **6 chữ số** (VD: `!veso 123456` hoặc gõ `!veso` để mua ngẫu nhiên).');
             }
 
             const bal = getBalance(userId);
             if (bal < TICKET_PRICE) {
-                return message.reply(`❌ Bạn cần ít nhất **${formatMoney(TICKET_PRICE)}** để mua vé số!`);
+                return message.reply(`<a:no:1554602168093507685> Bạn cần ít nhất **${formatMoney(TICKET_PRICE)}** để mua vé số!`);
             }
 
             setBalance(userId, bal - TICKET_PRICE);
@@ -1344,12 +1344,12 @@ client.on('messageCreate', async message => {
             });
             saveJSONSync(FILES.LOTTERY, lotteryData);
 
-            return message.reply(`🎫 Đã mua thành công vé số **${num}** với giá **${formatMoney(TICKET_PRICE)}**! Trúng Giải Đặc Biệt nhận ngay **100.000.000đ**!`);
+            return message.reply(`<:2990_yes:1554602080780689418> Đã mua thành công vé số **${num}** với giá **${formatMoney(TICKET_PRICE)}**! Trúng Giải Đặc Biệt nhận ngay **100.000.000đ**!`);
         }
 
         // LỆNH ÉP BOT RA KẾT QUẢ SỔ XỐ / LÔ ĐỀ NGAY
         if (['kqsx', 'quayso', 'eplode'].includes(command)) {
-            if (!isBotStaff(userId)) return message.reply('❌ Bạn không có quyền ép quay số!');
+            if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Bạn không có quyền ép quay số!');
             
             await message.reply('<:emoji_80:1554614708089126994> **Đang tiến hành quay số KQSX & Lô Đề ngay lập tức...**');
             const resData = await processLotteryDraw(true);
