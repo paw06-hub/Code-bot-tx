@@ -1132,12 +1132,12 @@ client.on('messageCreate', async message => {
         // 1. LỆNH MỜI THÀNH VIÊN VÀO PHÒNG (!moi)
         if (command === 'moi') {
             const roomInfo = hotelData.rooms[message.channel.id];
-            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
-            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền mời người khác!');
+            if (!roomInfo) return message.reply('<a:no:1554602168093507685> Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Chỉ có **chủ phòng** mới có quyền mời người khác!');
 
             const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!moi @user`');
-            if (targetUser.id === userId) return message.reply('⚠️ Bạn chính là chủ phòng rồi mà!');
+            if (!targetUser) return message.reply('<a:no:1554602168093507685> Cú pháp: `!moi @user`');
+            if (targetUser.id === userId) return message.reply('<a:as_warning:1554611415514357760> Bạn chính là chủ phòng rồi mà!');
 
             try {
                 await message.channel.permissionOverwrites.create(targetUser.id, {
@@ -1161,19 +1161,19 @@ client.on('messageCreate', async message => {
                 return message.reply(`<a:yes:1554602231389487125> Đã mời thành công ${targetUser} vào phòng khách sạn của bạn!`);
             } catch (err) {
                 console.error('[Room Invite Error]:', err);
-                return message.reply('❌ Có lỗi xảy ra khi cấp quyền cho thành viên.');
+                return message.reply('<a:no:1554602168093507685> Có lỗi xảy ra khi cấp quyền cho thành viên.');
             }
         }
 
         // 2. LỆNH ĐUỔI THÀNH VIÊN KHỎI PHÒNG (!duoi)
         if (command === 'duoi') {
             const roomInfo = hotelData.rooms[message.channel.id];
-            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
-            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền đuổi người khác!');
+            if (!roomInfo) return message.reply('<a:no:1554602168093507685> Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Chỉ có **chủ phòng** mới có quyền đuổi người khác!');
 
             const targetUser = message.mentions.users.first();
-            if (!targetUser) return message.reply('❌ Cú pháp: `!duoi @user`');
-            if (targetUser.id === userId || targetUser.id === roomInfo.ownerId) return message.reply('⚠️ Không thể tự đuổi chính mình hoặc chủ phòng!');
+            if (!targetUser) return message.reply('<a:no:1554602168093507685> Cú pháp: `!duoi @user`');
+            if (targetUser.id === userId || targetUser.id === roomInfo.ownerId) return message.reply('<a:as_warning:1554611415514357760> Không thể tự đuổi chính mình hoặc chủ phòng!');
 
             try {
                 await message.channel.permissionOverwrites.delete(targetUser.id);
