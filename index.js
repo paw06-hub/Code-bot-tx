@@ -936,8 +936,8 @@ client.on('interactionCreate', async interaction => {
                     .setColor('DarkGreen')
                     .setTitle(`🃏 BLACKJACK - ${user.username}`)
                     .addFields(
-                        { name: '<a:vuongmiendo:1554622871882436710> @Paw162', value: `${formatHand(game.dealerHand, true)} (?? điểm)` },
-                        { name: '<:Members:1554622922629451828> Bạn', value: `${formatHand(game.playerHand)} (${playerScore} điểm)` }
+                        { name: '@Paw162', value: `${formatHand(game.dealerHand, true)} (?? điểm)` },
+                        { name: 'Bạn', value: `${formatHand(game.playerHand)} (${playerScore} điểm)` }
                     )
                     .setFooter({ text: `Tiền cược: ${formatMoney(game.bet)}` });
 
