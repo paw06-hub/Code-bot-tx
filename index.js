@@ -293,8 +293,7 @@ function scheduleHotelTaxes() {
                     setBalance(ownerId, bal - taxAmount);
                     channel.send(`🔔 <@${ownerId}> Đã đến hạn đóng thuế phòng khách sạn! Hệ thống đã tự động thu **-${formatMoney(taxAmount)}** phí duy trì phòng.`).catch(() => {});
                 } else {
-                    // Không đủ tiền đóng thuế -> Tự động giải tán phòng
-                    channel.send(`⚠️ <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi[span_0](start_span)[span_0](end_span)!`).catch(() => {});
+                    channel.send(`⚠️ <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi[span_1](start_span)[span_1](end_span)!`).catch(() => {});
                     
                     const category = channel.parent;
                     if (category) {
@@ -666,7 +665,7 @@ client.once('ready', () => {
     }
     scheduleDailyLottery();
     scheduleCryptoMarket();
-    scheduleHotelTaxes(); // Khởi chạy tiến trình thu thuế khách sạn
+    scheduleHotelTaxes(); 
 });
 
 client.on('interactionCreate', async interaction => {
@@ -723,7 +722,7 @@ client.on('interactionCreate', async interaction => {
                     parent: category.id
                 });
 
-                // Lưu thông tin phòng vào hệ thống
+                // Lưu thông tin phòng vào hệ thống (Đã lưu kèm theo price gốc để hoàn tiền sau này)
                 hotelData.rooms[textChannel.id] = {
                     guildId: guildId,
                     ownerId: user.id,
@@ -739,9 +738,10 @@ client.on('interactionCreate', async interaction => {
                     .setDescription(`Chào mừng <@${user.id}> đã sở hữu không gian riêng tư thành công! Dưới đây là các đặc quyền và lệnh quản lý phòng của bạn:`)
                     .addFields(
                         { name: '👥 Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`\n• Đuổi: `!duoi @user`', inline: true },
-                        { name: '✏️️ Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
+                        { name: '✏ Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
+                        { name: '🚪 Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng và nhận lại 50% tiền VNĐ**[span_2](start_span)[span_2](end_span).', inline: false },
                         { name: '💰 Thông tin thuế & Duy trì', value: `• Giá thuê: **${formatMoney(roomInfo.price)}**\n• Phí duy trì: **${formatMoney(roomInfo.tax)} / giờ** (Trừ tự động vào ví).`, inline: false },
-                        { name: '⚠️ Lưu ý', value: 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng sẽ tự động bị thu hồi[span_1](start_span)[span_1](end_span)!', inline: false }
+                        { name: '⚠️ Lưu ý', value: 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng sẽ tự động bị thu hồi[span_3](start_span)[span_3](end_span)!', inline: false }
                     )
                     .setTimestamp();
 
@@ -1126,7 +1126,7 @@ client.on('messageCreate', async message => {
         }
 
         // ==========================================
-        // CÁC LỆNH QUẢN LÝ PHÒNG KHÁCH SẠN (!moi, !duoi, !doiten, !khoa, !mokhoa)
+        // CÁC LỆNH QUẢN LÝ PHÒNG KHÁCH SẠN (!moi, !duoi, !doiten, !khoa, !mokhoa, !traphong)
         // ==========================================
         
         // 1. LỆNH MỜI THÀNH VIÊN VÀO PHÒNG (!moi)
@@ -1256,6 +1256,43 @@ client.on('messageCreate', async message => {
             }
         }
 
+        // 5. LỆNH TRẢ PHÒNG VÀ HOÀN 50% TIỀN VNĐ (!traphong / !checkout)
+        if (command === 'traphong' || command === 'checkout') {
+            const roomInfo = hotelData.rooms[message.channel.id];
+            if (!roomInfo) return message.reply('❌ Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn**!');
+            if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('❌ Chỉ có **chủ phòng** mới có quyền trả phòng!');
+
+            // Tính 50% tiền hoàn lại dựa trên giá phòng đã thuê
+            const refundAmount = Math.floor(roomInfo.price * 0.5);
+            const currentBal = getBalance(roomInfo.ownerId);
+
+            // Cộng lại tiền vào ví chủ phòng
+            setBalance(roomInfo.ownerId, currentBal + refundAmount);
+
+            await message.reply(`✅ Bạn đã tiến hành trả phòng thành công! Hệ thống đã hoàn lại **+${formatMoney(refundAmount)}** (50% giá trị phòng) vào ví của <@${roomInfo.ownerId}>. Danh mục phòng sẽ được xóa sau 3 giây...`);
+
+            // Xóa toàn bộ kênh và danh mục phòng sau 3 giây
+            setTimeout(async () => {
+                try {
+                    const category = message.channel.parent;
+                    if (category) {
+                        for (const child of category.children.cache.values()) {
+                            await child.delete().catch(() => {});
+                        }
+                        await category.delete().catch(() => {});
+                    } else {
+                        await message.delete().catch(() => {});
+                    }
+                    delete hotelData.rooms[message.channel.id];
+                    saveJSONSync(FILES.HOTELS, hotelData);
+                } catch (err) {
+                    console.error('[Room Checkout Delete Error]:', err);
+                }
+            }, 3000);
+
+            return;
+        }
+
         // ==========================================
         // CÁC LỆNH ĐẶT CƯỢC LÔ ĐỀ & VÉ SỐ
         // ==========================================
@@ -1382,7 +1419,7 @@ client.on('messageCreate', async message => {
             if (!targetUser) return message.reply('❌ Cú pháp: `!addadmin @user`');
 
             if (targetUser.id === ADMIN_ID) {
-                return message.reply('⚠️️ Đây là Owner gốc rồi!');
+                return message.reply('⚠ Đây là Owner gốc rồi!');
             }
 
             if (adminList.users.includes(targetUser.id)) {
@@ -1401,7 +1438,7 @@ client.on('messageCreate', async message => {
 
             const index = adminList.users.indexOf(targetUser.id);
             if (index === -1) {
-                return message.reply(`⚠️ ${targetUser} không có trong danh sách Admin phụ!`);
+                return message.reply(`⚠️️ ${targetUser} không có trong danh sách Admin phụ!`);
             }
 
             adminList.users.splice(index, 1);
@@ -1432,7 +1469,7 @@ client.on('messageCreate', async message => {
             if (!targetUser) return message.reply('❌ Cú pháp: `!addstaff @user`');
 
             if (staffList.users.includes(targetUser.id)) {
-                return message.reply(`⚠️️ ${targetUser} đã có trong danh sách Staff từ trước!`);
+                return message.reply(`⚠ ${targetUser} đã có trong danh sách Staff từ trước!`);
             }
 
             staffList.users.push(targetUser.id);
@@ -1653,7 +1690,7 @@ client.on('messageCreate', async message => {
                     balances.set(uId, 50000); 
                 }
                 saveJSONSync(FILES.BALANCES, balances);
-                return message.reply('⚠️️ **Đã reset số dư của TOÀN BỘ thành viên trong server về mức khởi điểm (50.000đ)!**');
+                return message.reply('⚠ **Đã reset số dư của TOÀN BỘ thành viên trong server về mức khởi điểm (50.000đ)!**');
             }
 
             setBalance(targetUser.id, 50000); 
@@ -1741,7 +1778,7 @@ client.on('messageCreate', async message => {
                 .addFields(
                     { 
                         name: '🏨 Khách Sạn 24/7', 
-                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP (1.5 Tr) hoặc Hoàng Gia (5 Tr) để tự động tạo danh mục, chat và voice riêng (Tự động thu thuế mỗi giờ)\n• `!moi @user`: Mời bạn vào phòng khách sạn của bạn\n• `!duoi @user`: Đuổi thành viên khỏi phòng khách sạn\n• `!doiten <tên_mới>`: Đổi tên phòng khách sạn\n• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng', 
+                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP (1.5 Tr) hoặc Hoàng Gia (5 Tr)\n• `!moi @user`: Mời bạn vào phòng khách sạn của bạn\n• `!duoi @user`: Đuổi thành viên khỏi phòng khách sạn\n• `!doiten <tên_mới>`: Đổi tên phòng khách sạn\n• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng\n• `!traphong` (hoặc `!checkout`): Trả phòng và nhận lại **50% tiền VNĐ** vào ví[span_4](start_span)[span_4](end_span)', 
                         inline: false 
                     },
                     { 
