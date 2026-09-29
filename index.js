@@ -1458,7 +1458,7 @@ client.on('messageCreate', async message => {
 
             const embed = new EmbedBuilder()
                 .setColor('Gold')
-                .setTitle('👑 Danh Sách Owner & Admin BOT')
+                .setTitle('<:MH_supporter:1554613407552905226> Danh Sách Owner & Admin BOT')
                 .setDescription(desc);
             return message.reply({ embeds: [embed] });
         }
