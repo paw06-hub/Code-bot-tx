@@ -455,7 +455,7 @@ function scheduleDailyLottery() {
     }, 10000);
 }
 
-const SUITS = ['♠️', '♥️', '♦️', '♣️'];
+const SUITS = ['♠️', '♥️', '♦️', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 const createDeck = () => {
@@ -1040,7 +1040,7 @@ client.on('messageCreate', async message => {
             const resData = await processLotteryDraw(true);
             
             if (resData.sentCount === 0) {
-                return message.channel.send('⚠️ Đã quay xong kết quả nhưng chưa có kênh nào được cài đặt bằng lệnh `!setlode`!');
+                return message.channel.send('⚠️️ Đã quay xong kết quả nhưng chưa có kênh nào được cài đặt bằng lệnh `!setlode`!');
             }
             return;
         }
@@ -1313,13 +1313,31 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'exportdata') {
-            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner!');
-            const attachments = [];
-            for (const filePath of Object.values(FILES)) {
-                if (fs.existsSync(filePath)) attachments.push(new AttachmentBuilder(filePath));
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner mới có quyền này!');
+            
+            const allData = {};
+            for (const [key, filePath] of Object.entries(FILES)) {
+                if (fs.existsSync(filePath)) {
+                    try {
+                        const raw = fs.readFileSync(filePath, 'utf8');
+                        allData[key] = JSON.parse(raw);
+                    } catch (e) {
+                        console.error(`[Export Read Error] ${filePath}:`, e.message);
+                    }
+                }
             }
-            await message.author.send({ content: '📦 **Backup dữ liệu:**', files: attachments }).catch(() => null);
-            return message.reply('✅ Đã gửi file backup vào tin nhắn riêng!');
+
+            const backupFilePath = './bot_backup_all.json';
+            fs.writeFileSync(backupFilePath, JSON.stringify(allData, null, 2), 'utf8');
+
+            const attachment = new AttachmentBuilder(backupFilePath);
+            await message.author.send({ content: '📦 **File backup tổng hợp toàn bộ dữ liệu bot:**', files: [attachment] }).catch(() => null);
+            
+            setTimeout(() => {
+                if (fs.existsSync(backupFilePath)) fs.unlinkSync(backupFilePath);
+            }, 5000);
+
+            return message.reply('✅ Đã đóng gói toàn bộ dữ liệu thành **1 file duy nhất** và gửi vào tin nhắn riêng cho bạn!');
         }
 
         if (command === 'cong') {
@@ -1329,6 +1347,38 @@ client.on('messageCreate', async message => {
             if (!targetUser || isNaN(amount)) return message.reply('❌ Sai cú pháp! VD: `!cong @user 50000`');
             setBalance(targetUser.id, getBalance(targetUser.id) + amount);
             return message.reply(`✅ Đã cộng **${formatMoney(amount)}** cho ${targetUser}!`);
+        }
+
+        if (command === 'tru') {
+            if (!isBotStaff(userId)) return message.reply('❌ Không có quyền!');
+            const targetUser = message.mentions.users.first();
+            const amount = parseInt(args[1], 10);
+            if (!targetUser || isNaN(amount) || amount <= 0) return message.reply('❌ Sai cú pháp! VD: `!tru @user 50000`');
+            
+            const currentBal = getBalance(targetUser.id);
+            const newBal = Math.max(0, currentBal - amount); 
+            setBalance(targetUser.id, newBal);
+            return message.reply(`✅ Đã trừ **${formatMoney(amount)}** của ${targetUser}! Số dư mới: **${formatMoney(newBal)}**`);
+        }
+
+        if (command === 'resetmoney' || command === 'resetvon') {
+            if (!isBotOwner(userId)) return message.reply('❌ Chỉ Owner gốc mới có quyền reset tiền hệ thống!');
+            const targetUser = message.mentions.users.first();
+            
+            if (!targetUser && args[0]?.toLowerCase() !== 'all') {
+                return message.reply('❌ Cú pháp: `!resetmoney @user` (hoặc `!resetmoney all` nếu muốn reset toàn server).');
+            }
+
+            if (args[0]?.toLowerCase() === 'all') {
+                for (const [uId] of balances.entries()) {
+                    balances.set(uId, 50000); 
+                }
+                saveJSONSync(FILES.BALANCES, balances);
+                return message.reply('⚠️ **Đã reset số dư của TOÀN BỘ thành viên trong server về mức khởi điểm (50.000đ)!**');
+            }
+
+            setBalance(targetUser.id, 50000); 
+            return message.reply(`🔄 Đã reset số dư của ${targetUser} về mức khởi điểm (**50.000đ**) thành công!`);
         }
 
         if (command === 'settaixiu') {
@@ -1427,7 +1477,7 @@ client.on('messageCreate', async message => {
                     },
                     { 
                         name: '⚙️ Lệnh Quản Trị & Cấu Hình (Admin / Staff)', 
-                        value: '• `!kqsx` (hoặc `!quayso`): Ép bot ra kết quả Xổ Số & Lô Đề ngay lập tức\n• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!addadmin @user`: Thêm Admin phụ tối cao (Chỉ Owner gốc)\n• `!removeadmin @user`: Gỡ Admin phụ (Chỉ Owner gốc)\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff\n• `!removestaff @user`: Xóa quản trị viên Staff\n• `!liststaff`: Xem danh sách Staff\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
+                        value: '• `!kqsx` (hoặc `!quayso`): Ép bot ra kết quả Xổ Số & Lô Đề ngay lập tức\n• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!tru @user <số_tiền>`: Trừ tiền của người chơi (Staff+)\n• `!resetmoney @user` (hoặc `all`): Reset ví tiền về mặc định (Owner)\n• `!addadmin @user`: Thêm Admin phụ tối cao (Chỉ Owner gốc)\n• `!removeadmin @user`: Gỡ Admin phụ (Chỉ Owner gốc)\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff\n• `!removestaff @user`: Xóa quản trị viên Staff\n• `!liststaff`: Xem danh sách Staff\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Chỉ Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
                         inline: false 
                     }
                 )
