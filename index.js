@@ -1828,7 +1828,7 @@ client.on('messageCreate', async message => {
 
             const embed = new EmbedBuilder()
                 .setColor('Blurple')
-                .setTitle(`🪪 HỒ SƠ - ${targetUser.username}`)
+                .setTitle(`<:user:1554598652620709950> HỒ SƠ - ${targetUser.username}`)
                 .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: '💲 Số dư', value: `**${formatMoney(bal)}**`, inline: false },
