@@ -223,14 +223,14 @@ const HELP_PAGES = [
         title: "🏠 TỔNG QUAN & HƯỚNG DẪN NHANH",
         emoji: "🏠",
         description: "Chào mừng bạn đến với hệ thống giải trí.\n\n" +
-            "💡 **Tiền tố lệnh mặc định:** Gõ `!` trước mỗi lệnh (VD: `!balance`, `!daily`, `!khachsan`...) hoặc dùng Slash commands `/`.\n" +
+            "💡 **Tiền tố lệnh mặc định:** Gõ `!` trước mỗi lệnh (VD: `!balance`, `!daily`, `!nap`...) hoặc dùng Slash commands `/`.\n" +
             "💰 **Hệ thống tiền tệ:**\n" +
             "• 🪙 **VNĐ (VNĐ):** Đơn vị tiền tệ chính để đặt cược, nâng cấp, trao đổi và mua sắm.\n" +
             "• 🎫 **Vé Số:** Dùng để mua vé số trúng thưởng lớn.\n\n" +
             "📌 **Mẹo dành cho người mới:**\n" +
             "• `!daily` để nhận quà điểm danh mỗi ngày.\n" +
-            "• `!khachsan` để thuê phòng riêng tư nhận đặc quyền.\n" +
-            "• `!coin` để tham gia thị trường tiền ảo và chứng khoán.\n\n" +
+            "• `!nap` để nạp tiền vào tài khoản tự động qua QR.\n" +
+            "• `!khachsan` để thuê phòng riêng tư nhận đặc quyền.\n\n" +
             "👉 Chọn danh mục từ menu thả xuống hoặc bấm nút chuyển trang để xem chi tiết từng nhóm lệnh."
     },
     {
@@ -240,6 +240,7 @@ const HELP_PAGES = [
             "• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại\n" +
             "• `!profile` (hoặc `!pf`): Xem hồ sơ cá nhân, xếp hạng và danh hiệu\n" +
             "• `!daily`: Điểm danh nhận thưởng hằng ngày (100.000đ)\n" +
+            "• `!nap`: Tạo yêu cầu nạp tiền qua mã QR chuyển khoản\n" +
             "• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia trong server\n" +
             "• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%, tối đa 1 Tỷ)\n" +
             "• `!trano <số_tiền|all>`: Trả nợ ngân hàng"
@@ -287,6 +288,7 @@ const HELP_PAGES = [
             "• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n" +
             "• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n" +
             "• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n" +
+            "• `!setadminpay`: Đặt kênh nhận yêu cầu duyệt nạp tiền\n" +
             "• `!setnoitu`: Đặt kênh chơi game Nối Từ\n" +
             "• `!kqsx`: Ép bot quay thưởng Xổ Số & Lô Đề ngay lập tức\n" +
             "• `!cong @user <số_tiền>` / `!tru @user <số_tiền>`: Cộng / Trừ tiền người chơi\n" +
@@ -727,7 +729,7 @@ async function startTaiXiuLoop(guildId, channelId) {
         const embedOpen = new EmbedBuilder()
             .setColor('Gold')
             .setTitle(`🎲 PHIÊN TÀI XỈU #${txSession.sessionNumber}`)
-            .setDescription(`⏱️ Thời gian đặt cược: **40 giây**.\n📊 **SOI CẦU (10 phiên gần nhất):**\n${bridgeText}\n\n👇 **Bấm nút bên dưới để cược!**`)
+            .setDescription(`⏱️️ Thời gian đặt cược: **40 giây**.\n📊 **SOI CẦU (10 phiên gần nhất):**\n${bridgeText}\n\n👇 **Bấm nút bên dưới để cược!**`)
             .addFields(
                 { name: '🔴 CỬA TÀI', value: '💰 **0đ**\n👥 **0** người', inline: true },
                 { name: '🔵 CỬA XỈU', value: '💰 **0đ**\n👥 **0** người', inline: true }
@@ -745,7 +747,6 @@ async function startTaiXiuLoop(guildId, channelId) {
         await new Promise(res => setTimeout(res, 40000));
         txSession.isOpen = false;
 
-        // XÓA BẢNG CƯỢC CŨ NGAY KHI HẾT GIỜ ĐẶT CƯỢC
         if (txSession.lastOpenMessage) {
             await txSession.lastOpenMessage.delete().catch(() => {});
             txSession.lastOpenMessage = null;
@@ -797,13 +798,11 @@ async function startTaiXiuLoop(guildId, channelId) {
             .setDescription(resultText)
             .setTimestamp();
 
-        // GỬI TIN NHẮN KẾT QUẢ (GIỮ LẠI LÀM LỊCH SỬ KẾT QUẢ)
         await channel.send({ embeds: [embedResult] }).catch(() => null);
 
         txSession.sessionNumber++;
         saveTaiXiuState(guildId, txSession);
 
-        // CHUYỂN SANG PHIÊN MỚI SAU 10 GIÂY
         txSession.timeoutId = setTimeout(runSession, 10000);
     };
 
@@ -875,6 +874,64 @@ client.on('interactionCreate', async interaction => {
             const embed = getHelpEmbed(targetIndex);
             const components = getHelpComponents(targetIndex);
             return interaction.update({ embeds: [embed], components: components });
+        }
+
+        // ==========================================
+        // XỬ LÝ NÚT DUYỆT / TỪ CHỐI NẠP TIỀN
+        // ==========================================
+        if (interaction.isButton() && (interaction.customId.startsWith('pay_approve_') || interaction.customId.startsWith('pay_reject_'))) {
+            if (!isBotStaff(user.id)) {
+                return interaction.reply({ content: '<a:no:1554602168093507685> Bạn không có quyền duyệt giao dịch nạp tiền!', ephemeral: true });
+            }
+
+            const parts = interaction.customId.split('_');
+            const action = parts[1]; // approve hoặc reject
+            const targetUserId = parts[2];
+            const amount = parseInt(parts[3], 10);
+
+            const targetMember = await interaction.guild.members.fetch(targetUserId).catch(() => null);
+            const targetUserObj = targetMember ? targetMember.user : await client.users.fetch(targetUserId).catch(() => null);
+
+            if (action === 'approve') {
+                const currentBal = getBalance(targetUserId);
+                setBalance(targetUserId, currentBal + amount);
+
+                const successEmbed = new EmbedBuilder()
+                    .setColor('Green')
+                    .setTitle('✅ NẠP TIỀN THÀNH CÔNG')
+                    .setDescription(`Yêu cầu nạp **${formatMoney(amount)}** của bạn đã được Quản Trị Viên **${user.username}** duyệt thành công! Số dư đã được cộng vào ví.`)
+                    .setTimestamp();
+
+                if (targetUserObj) {
+                    await targetUserObj.send({ embeds: [successEmbed] }).catch(() => {});
+                }
+
+                const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+                    .setColor('Green')
+                    .setTitle('✅ ĐÃ DUYỆT GIAO DỊCH NẠP TIỀN')
+                    .addFields({ name: '🛡️ Người duyệt', value: `<@${user.id}>`, inline: false });
+
+                await interaction.update({ embeds: [updatedEmbed], components: [] });
+                return interaction.followUp({ content: `<a:yes:1554602231389487125> Đã duyệt nạp thành công **${formatMoney(amount)}** cho <@${targetUserId}>!`, ephemeral: true });
+            } else {
+                const rejectEmbed = new EmbedBuilder()
+                    .setColor('Red')
+                    .setTitle('❌ NẠP TIỀN BỊ TỪ CHỐI')
+                    .setDescription(`Yêu cầu nạp **${formatMoney(amount)}** của bạn đã bị Quản Trị Viên **${user.username}** từ chối (Giao dịch không hợp lệ hoặc không nhận được tiền).`)
+                    .setTimestamp();
+
+                if (targetUserObj) {
+                    await targetUserObj.send({ embeds: [rejectEmbed] }).catch(() => {});
+                }
+
+                const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+                    .setColor('Red')
+                    .setTitle('❌ ĐÃ TỪ CHỐI GIAO DỊCH NẠP TIỀN')
+                    .addFields({ name: '🛡️️ Người từ chối', value: `<@${user.id}>`, inline: false });
+
+                await interaction.update({ embeds: [updatedEmbed], components: [] });
+                return interaction.followUp({ content: `<a:no:1554602168093507685> Đã từ chối giao dịch nạp của <@${targetUserId}>.`, ephemeral: true });
+            }
         }
 
         if (interaction.isButton() && ['hotel_vip', 'hotel_hoanggia', 'hotel_dacbiet'].includes(interaction.customId)) {
@@ -955,7 +1012,7 @@ client.on('interactionCreate', async interaction => {
                     .setTitle(`🏨 HƯỚNG DẪN SỬ DỤNG ${roomInfo.name.toUpperCase()}`)
                     .setDescription(`Chào mừng <@${user.id}> đã sở hữu không gian riêng tư thành công! Dưới đây là các đặc quyền và lệnh quản lý phòng của bạn:${bonusMsg}`)
                     .addFields(
-                        { name: '🏷️️ Role Khách Sạn', value: `Bạn đã nhận được Role độc quyền: ${roomRole}`, inline: false },
+                        { name: '🏷 Role Khách Sạn', value: `Bạn đã nhận được Role độc quyền: ${roomRole}`, inline: false },
                         { name: '<:33218colorroledotspackids:1554608256804982854> Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`\n• Đuổi: `!duoi @user`', inline: true },
                         { name: '<a:2902originallyknownas:1554631297035407364> Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
                         { name: '<a:3642bunpay:1554630887629656115> Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng, gỡ Role và nhận lại 50% tiền VNĐ**.', inline: false },
@@ -1332,6 +1389,86 @@ client.on('messageCreate', async message => {
     try {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
+
+        // ==========================================
+        // LỆNH NẠP TIỀN QUA QR GỬI DM CHO NGƯỜI DÙNG
+        // ==========================================
+        if (command === 'nap' || command === 'naptien') {
+            const amount = parseInt(args[0], 10);
+            if (isNaN(amount) || amount <= 1000) {
+                return message.reply('<a:no:1554602168093507685> Cú pháp: `!nap <số_tiền>` (Tối thiểu 1.000đ).');
+            }
+
+            const guildCfg = config[guildId];
+            const adminPayChannelId = typeof guildCfg === 'object' ? guildCfg.adminPayChannelId : null;
+
+            if (!adminPayChannelId) {
+                return message.reply('<a:no:1554602168093507685> Hệ thống nạp tiền chưa được cấu hình kênh duyệt trong server này! Vui lòng báo Admin dùng lệnh `!setadminpay` để thiết lập.');
+            }
+
+            const bankId = "TPBANK"; // Mã ngân hàng TPBank
+            const accountNo = "31189838888"; // Số tài khoản TPBank của bạn
+            const template = "compact2";
+            const addInfo = `NAP ${message.author.username} ${amount}`;
+            
+            // Link API tạo VietQR tự động với thông tin TPBank
+            const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png?amount=${amount}&addInfo=${encodeURIComponent(addInfo)}`;
+
+            const dmEmbed = new EmbedBuilder()
+                .setColor('Gold')
+                .setTitle('💳 HƯỚNG DẪN CHUYỂN KHOẢN NẠP TIỀN')
+                .setDescription(`Bạn vừa tạo yêu cầu nạp **${formatMoney(amount)}**.\n\nVui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:\n` +
+                    `• **Ngân hàng:** TPBank\n` +
+                    `• **Số tài khoản:** \`${accountNo}\`\n` +
+                    `• **Chủ tài khoản:** LE BAO TRUNG\n` +
+                    `• **Số tiền:** \`${amount}\`\n` +
+                    `• **Nội dung chuyển khoản:** \`${addInfo}\`\n\n` +
+                    `*Sau khi chuyển khoản, hệ thống Admin sẽ kiểm tra và duyệt tiền vào tài khoản cho bạn trong giây lát!*`)
+                .setImage(qrUrl)
+                .setTimestamp();
+
+            try {
+                await message.author.send({ embeds: [dmEmbed] });
+            } catch (err) {
+                return message.reply('<a:no:1554602168093507685> Không thể gửi tin nhắn riêng (DM) cho bạn! Hãy mở cài đặt tin nhắn riêng tư (Direct Messages) của server này rồi thử lại.');
+            }
+
+            // GỬI THÔNG BÁO KÈM 2 NÚT DUYỆT / TỪ CHỐI VÀO KÊNH ADMIN CHỈ ĐỊNH
+            const adminChannel = await client.channels.fetch(adminPayChannelId).catch(() => null);
+            if (adminChannel) {
+                const adminEmbed = new EmbedBuilder()
+                    .setColor('Yellow')
+                    .setTitle('🔔 YÊU CẦU NẠP TIỀN MỚI CẦN DUYỆT')
+                    .setDescription(`• **Người chơi:** ${message.author} (\`${message.author.id}\`)\n• **Số tiền nạp:** **${formatMoney(amount)}**\n• **Nội dung CK:** \`${addInfo}\``)
+                    .setTimestamp();
+
+                const rowButtons = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`pay_approve_${message.author.id}_${amount}`)
+                        .setLabel('Duyệt')
+                        .setStyle(ButtonStyle.Success),
+                    new ButtonBuilder()
+                        .setCustomId(`pay_reject_${message.author.id}_${amount}`)
+                        .setLabel('Từ Chối')
+                        .setStyle(ButtonStyle.Danger)
+                );
+
+                await adminChannel.send({ embeds: [adminEmbed], components: [rowButtons] });
+            }
+
+            return message.reply('<a:yes:1554602231389487125> Đã gửi thông tin chuyển khoản kèm mã QR qua **Tin nhắn riêng (DM)** cho bạn! Vui lòng kiểm tra.');
+        }
+
+        if (command === 'setadminpay') {
+            if (!isBotStaff(userId) && !message.member.permissions.has('Administrator')) return message.reply('<a:no:1554602168093507685> Bạn không có quyền cấu hình kênh!');
+            const targetChannel = message.mentions.channels.first() || message.channel;
+
+            if (typeof config[guildId] !== 'object') config[guildId] = {};
+            config[guildId].adminPayChannelId = targetChannel.id;
+            saveJSONSync(FILES.CONFIG, config);
+
+            return message.reply(`<a:yes:1554602231389487125> Đã thiết lập kênh nhận yêu cầu duyệt nạp tiền tại ${targetChannel}.`);
+        }
 
         if (command === 'khachsan' || command === 'thuephong' || command === 'hotel') {
             const embed = new EmbedBuilder()
@@ -2019,7 +2156,7 @@ client.on('messageCreate', async message => {
                 .addFields(
                     { 
                         name: '🛠️ Cấu Hình Hệ Thống & Kênh', 
-                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!kqsx` (hoặc `!quayso`): Ép bot ra kết quả Xổ Số & Lô Đề ngay lập tức', 
+                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setadminpay`: Đặt kênh nhận yêu cầu duyệt nạp tiền\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!kqsx` (hoặc `!quayso`): Ép bot ra kết quả Xổ Số & Lô Đề ngay lập tức', 
                         inline: false 
                     },
                     { 
