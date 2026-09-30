@@ -1838,7 +1838,7 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed] });
         }
 
-        if (command === 'profile' || command === 'pf') {
+                if (command === 'profile' || command === 'pf') {
             const targetUser = message.mentions.users.first() || message.author;
             const bal = getBalance(targetUser.id);
             
@@ -1849,11 +1849,11 @@ client.on('messageCreate', async message => {
             let titleText = customTitles.get(targetUser.id);
             if (!titleText) {
                 if (targetUser.id === ADMIN_ID || adminList.users.includes(targetUser.id)) {
-                    titleText = '<a:Crown:1554608058460676167> Owner';
+                    titleText = '<a:Crown:1554608058460676167> Owner <a:Crown:1554608058460676167>';
                 } else if (isBotStaff(targetUser.id)) {
                     titleText = '<:994180roleadminred:1554607509724209153> Quản Trị Viên';
                 } else {
-                    titleText = '<:33218colorroledotspackids:1554608256804982854> Thành Viên';
+                    titleText = '<:Members:1554622922629451828> Member'; // Đã đổi danh hiệu mặc định thành Member ở đây
                 }
             }
 
