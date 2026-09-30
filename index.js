@@ -899,7 +899,7 @@ client.on('interactionCreate', async interaction => {
 
                 const successEmbed = new EmbedBuilder()
                     .setColor('Green')
-                    .setTitle('✅ NẠP TIỀN THÀNH CÔNG')
+                    .setTitle('<a:yes:1554602231389487125> NẠP TIỀN THÀNH CÔNG')
                     .setDescription(`Yêu cầu nạp **${formatMoney(amount)}** của bạn đã được Quản Trị Viên **${user.username}** duyệt thành công! Số dư đã được cộng vào ví.`)
                     .setTimestamp();
 
@@ -909,15 +909,15 @@ client.on('interactionCreate', async interaction => {
 
                 const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                     .setColor('Green')
-                    .setTitle('✅ ĐÃ DUYỆT GIAO DỊCH NẠP TIỀN')
-                    .addFields({ name: '🛡️ Người duyệt', value: `<@${user.id}>`, inline: false });
+                    .setTitle('<a:yes:1554602231389487125> ĐÃ DUYỆT GIAO DỊCH NẠP TIỀN')
+                    .addFields({ name: '<:IMG_6210:1554607560177352737> Người duyệt', value: `<@${user.id}>`, inline: false });
 
                 await interaction.update({ embeds: [updatedEmbed], components: [] });
                 return interaction.followUp({ content: `<a:yes:1554602231389487125> Đã duyệt nạp thành công **${formatMoney(amount)}** cho <@${targetUserId}>!`, ephemeral: true });
             } else {
                 const rejectEmbed = new EmbedBuilder()
                     .setColor('Red')
-                    .setTitle('❌ NẠP TIỀN BỊ TỪ CHỐI')
+                    .setTitle('<a:no:1554602168093507685> NẠP TIỀN BỊ TỪ CHỐI')
                     .setDescription(`Yêu cầu nạp **${formatMoney(amount)}** của bạn đã bị Quản Trị Viên **${user.username}** từ chối (Giao dịch không hợp lệ hoặc không nhận được tiền).`)
                     .setTimestamp();
 
@@ -927,8 +927,8 @@ client.on('interactionCreate', async interaction => {
 
                 const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                     .setColor('Red')
-                    .setTitle('❌ ĐÃ TỪ CHỐI GIAO DỊCH NẠP TIỀN')
-                    .addFields({ name: '🛡️️ Người từ chối', value: `<@${user.id}>`, inline: false });
+                    .setTitle('<a:no:1554602168093507685> ĐÃ TỪ CHỐI GIAO DỊCH NẠP TIỀN')
+                    .addFields({ name: '<:IMG_6210:1554607560177352737> Người từ chối', value: `<@${user.id}>`, inline: false });
 
                 await interaction.update({ embeds: [updatedEmbed], components: [] });
                 return interaction.followUp({ content: `<a:no:1554602168093507685> Đã từ chối giao dịch nạp của <@${targetUserId}>.`, ephemeral: true });
@@ -964,7 +964,7 @@ client.on('interactionCreate', async interaction => {
 
             try {
                 const roomRole = await interaction.guild.roles.create({
-                    name: `Khách Hàng - ${user.username}`,
+                    name: `Khách Thuê Phòng - ${user.username}`,
                     color: roomInfo.color,
                     reason: `Role dành cho người thuê phòng ${roomInfo.name}`
                 });
@@ -1969,7 +1969,7 @@ client.on('messageCreate', async message => {
             if (isNaN(amount) || amount <= 0) {
                 const embed = new EmbedBuilder()
                     .setColor('Yellow')
-                    .setTitle('🏦 NGÂN HÀNG 2ChânBank - THÔNG TIN VAY')
+                    .setTitle('<:bank:1554873664254644244> NGÂN HÀNG 2ChânBank - THÔNG TIN VAY')
                     .setDescription(`• Lãi suất cố định: **${LOAN_INTEREST_RATE * 100}%**\n• Hạn ngạch tối đa: **${formatMoney(MAX_LOAN_LIMIT)}**\n• Nợ hiện tại của bạn: **${formatMoney(currentDebt)}**`);
                 return message.reply({ embeds: [embed] });
             }
