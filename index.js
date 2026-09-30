@@ -1774,7 +1774,7 @@ client.on('messageCreate', async message => {
         if (command === 'hlp' || command === 'giupde' || command === 'help') {
             const embed = new EmbedBuilder()
                 .setColor('Random')
-                .setTitle('📖 BẢNG HƯỚNG DẪN CÁC LỆNH DÀNH CHO THÀNH VIÊN')
+                .setTitle('📖 BẢNG HƯỚNG DẪN CÁC LỆNH')
                 .setDescription('Danh sách các lệnh giải trí, tài chính, giao dịch coin và dịch vụ khách sạn:')
                 .addFields(
                     { 
