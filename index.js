@@ -38,7 +38,7 @@ const client = new Client({
 // CONFIGURATION (Hỗ trợ 2 Owner ID)
 const PREFIX = '!';
 const TOKEN = process.env.TOKEN || 'YOUR_BOT_TOKEN_HERE';
-const ADMIN_IDS = ['1298727049451540541', 'ID_OWNER_THU_HAI_O_DAY']; 
+const ADMIN_IDS = ['1298727049451540541', '1498554147304247296']; 
 
 const FILES = {
     BALANCES: './balances.json',
