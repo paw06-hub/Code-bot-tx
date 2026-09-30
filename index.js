@@ -1108,27 +1108,31 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // ==========================================
+                // ==========================================
         // LỆNH THUÊ PHÒNG KHÁCH SẠN
         // ==========================================
         if (command === 'khachsan' || command === 'thuephong' || command === 'hotel') {
             const embed = new EmbedBuilder()
                 .setColor('Gold')
                 .setTitle('🏨 HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN 24/7')
-                .setDescription('Thuê phòng riêng tư để nhận ngay **Danh mục, Kênh Chat và Kênh Voice độc quyền**!\n\n• **Phòng VIP:** `1.500.000đ` (Thuế: 200.000đ/giờ)\n• **Phòng Tổng Thống:** `5.000.000đ` (Thuế: 500.000đ/giờ)\n\n*Bấm nút bên dưới để chọn phòng muốn thuê:*');
+                .setDescription(
+                    `Thuê phòng riêng tư để nhận ngay **Danh mục, Kênh Chat và Kênh Voice độc quyền**!\n\n` +
+                    `• **${HOTEL_PRICES.vip.name}:** \`${formatMoney(HOTEL_PRICES.vip.price)}\` (Thuế: ${formatMoney(HOTEL_PRICES.vip.tax)}/giờ)\n` +
+                    `• **${HOTEL_PRICES.hoanggia.name}:** \`${formatMoney(HOTEL_PRICES.hoanggia.price)}\` (Thuế: ${formatMoney(HOTEL_PRICES.hoanggia.tax)}/giờ)\n\n` +
+                    `*Bấm nút bên dưới để chọn phòng muốn thuê:*`
+                );
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-    .setCustomId('hotel_vip')
-    .setEmoji('1554621025562525788')
-    .setLabel('Thuê Phòng VIP (1.5 Tr)')
-    .setStyle(ButtonStyle.Success),
-new ButtonBuilder()
-    .setCustomId('hotel_hoanggia')
-    .setEmoji('1554620960034791424')
-    .setLabel('Thuê Phòng Tổng Thống (5 Tr)')
-    .setStyle(ButtonStyle.Primary)
-
+                    .setCustomId('hotel_vip')
+                    .setEmoji('1554621025562525788')
+                    .setLabel(`Thuê ${HOTEL_PRICES.vip.name} (${formatMoney(HOTEL_PRICES.vip.price)})`)
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('hotel_hoanggia')
+                    .setEmoji('1554620960034791424')
+                    .setLabel(`Thuê ${HOTEL_PRICES.hoanggia.name} (${formatMoney(HOTEL_PRICES.hoanggia.price)})`)
+                    .setStyle(ButtonStyle.Primary)
             );
 
             return message.reply({ embeds: [embed], components: [row] });
