@@ -1954,7 +1954,7 @@ client.on('messageCreate', async message => {
 
             const embed = new EmbedBuilder()
                 .setColor('Gold')
-                .setTitle('🏆 BẢNG XẾP HẠNG ĐẠI GIA')
+                .setTitle('<:emoji_63:1554667500862439555> BẢNG XẾP HẠNG ĐẠI GIA <:emoji_63:1554667500862439555>')
                 .setDescription(desc || 'Chưa có dữ liệu.')
                 .setTimestamp();
 
