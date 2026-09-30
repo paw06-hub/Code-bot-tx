@@ -38,7 +38,12 @@ const client = new Client({
 // CONFIGURATION
 const PREFIX = '!';
 const TOKEN = process.env.TOKEN || 'YOUR_BOT_TOKEN_HERE';
-const ADMIN_ID = process.env.ADMIN_ID || '1298727049451540541', '1498554147304247296'; 
+// Thay đổi phần này ở cấu hình đầu code:
+const ADMIN_IDS = ['1298727049451540541', '1498554147304247296']; 
+
+// Thay thế hàm kiểm tra Owner thành:
+const isBotOwner = (userId) => ADMIN_IDS.includes(userId) || adminList.users.includes(userId);
+const isBotStaff = (userId) => isBotOwner(userId) || staffList.users.includes(userId); 
 
 const FILES = {
     BALANCES: './balances.json',
