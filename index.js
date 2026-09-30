@@ -1862,9 +1862,9 @@ client.on('messageCreate', async message => {
                 .setTitle(`🪪 Profile - ${targetUser.username}`)
                 .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
                 .addFields(
-                    { name: '💲 Số dư', value: `**${formatMoney(bal)}**`, inline: false },
-                    { name: '🏆 BXH Toàn Cầu', value: `**${rankText}**`, inline: false },
-                    { name: '🎖️ Danh hiệu', value: `**${titleText}**`, inline: false }
+                    { name: '<:emoji_59:1554662943826776105> Số dư', value: `**${formatMoney(bal)}**`, inline: false },
+                    { name: '<:emoji_59:1554662954471915691> BXH Toàn Cầu', value: `**${rankText}**`, inline: false },
+                    { name: '<:emoji_60:1554662976022249623> Danh hiệu', value: `**${titleText}**`, inline: false }
                 );
             return message.reply({ embeds: [embed] });
         }
