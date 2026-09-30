@@ -2,7 +2,7 @@ const {
     Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, 
     ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle,
     AttachmentBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
-    ChannelType, PermissionFlagsBits
+    ChannelType, PermissionFlagsBits, REST, Routes
 } = require('discord.js');
 const fs = require('fs');
 const express = require('express');
@@ -214,6 +214,134 @@ const getCoinSelectMenu = (actionType) => {
             ])
     );
 };
+
+// ==========================================
+// CẤU HÌNH DỮ LIỆU TRANG TRỢ GIÚP (/trogiup)
+// ==========================================
+const HELP_PAGES = [
+    {
+        title: "🏠 TỔNG QUAN & HƯỚNG DẪN NHANH",
+        emoji: "🏠",
+        description: "Chào mừng bạn đến với hệ thống giải trí.\n\n" +
+            "💡 **Tiền tố lệnh mặc định:** Gõ `!` trước mỗi lệnh (VD: `!balance`, `!daily`, `!khachsan`...) hoặc dùng Slash commands `/`.\n" +
+            "💰 **Hệ thống tiền tệ:**\n" +
+            "• 🪙 **VNĐ (VNĐ):** Đơn vị tiền tệ chính để đặt cược, nâng cấp, trao đổi và mua sắm.\n" +
+            "• 🎫 **Vé Số:** Dùng để mua vé số trúng thưởng lớn.\n\n" +
+            "📌 **Mẹo dành cho người mới:**\n" +
+            "• `!daily` để nhận quà điểm danh mỗi ngày.\n" +
+            "• `!khachsan` để thuê phòng riêng tư nhận đặc quyền.\n" +
+            "• `!coin` để tham gia thị trường tiền ảo và chứng khoán.\n\n" +
+            "👉 Chọn danh mục từ menu thả xuống hoặc bấm nút chuyển trang để xem chi tiết từng nhóm lệnh."
+    },
+    {
+        title: "💰 HỆ THỐNG & TÀI CHÍNH",
+        emoji: "📜",
+        description: "Danh sách các lệnh quản lý tài chính và tài khoản cá nhân:\n\n" +
+            "• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại\n" +
+            "• `!profile` (hoặc `!pf`): Xem hồ sơ cá nhân, xếp hạng và danh hiệu\n" +
+            "• `!daily`: Điểm danh nhận thưởng hằng ngày (100.000đ)\n" +
+            "• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia trong server\n" +
+            "• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%, tối đa 1 Tỷ)\n" +
+            "• `!trano <số_tiền|all>`: Trả nợ ngân hàng"
+    },
+    {
+        title: "🏨 TIỆN ÍCH KHÁCH SẠN & DỊCH VỤ",
+        emoji: "⚙️",
+        description: "Hệ thống thuê phòng khách sạn và quản lý phòng riêng tư 24/7:\n\n" +
+            "• `!khachsan` (hoặc `!thuephong`): Mở bảng giao diện chọn thuê Phòng VIP, Hoàng Gia, Đặc Biệt\n" +
+            "• `!moi @user`: Mời bạn bè vào phòng khách sạn và trao Role\n" +
+            "• `!duoi @user`: Đuổi thành viên khỏi phòng và tước quyền\n" +
+            "• `!doiten <tên_mới>`: Đổi tên hiển thị phòng khách sạn\n" +
+            "• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng với người ngoài\n" +
+            "• `!traphong` (hoặc `!checkout`): Trả phòng, gỡ Role và nhận lại **50% tiền** hoàn lại vào ví"
+    },
+    {
+        title: "🎲 CASINO & MINIGAMES",
+        emoji: "🎲",
+        description: "Danh sách các trò chơi giải trí và cá cược:\n\n" +
+            "• `!bj <số_tiền>` (hoặc `!blackjack`): Chơi bài Blackjack (Xì Dách) đấu với nhà cái\n" +
+            "• **Tài Xỉu:** Tham gia cược Tài Xỉu tự động qua các nút bấm tương tác tại kênh cấu hình\n" +
+            "• **Nối Từ:** Tham gia gõ từ ghép 2 tiếng tại kênh Nối Từ (`!noitu reset` để làm mới)"
+    },
+    {
+        title: "🎟️ XỔ SỐ & LÔ ĐỀ",
+        emoji: "🎰",
+        description: "Hệ thống trò chơi may rủi xổ số kiến thiết:\n\n" +
+            "• `!lo <số_2_chữ> <tiền>`: Đánh Lô (1 ăn 3.5 mỗi nháy trong 27 giải)\n" +
+            "• `!de <số_2_chữ> <tiền>`: Đánh Đề (1 ăn 70 Giải Đặc Biệt)\n" +
+            "• `!veso [6_chữ_số]` (hoặc `!muaveso`): Mua vé số 6 chữ số giá 10.000đ (Trúng 100 Trợn)\n" +
+            "• Lịch quay thưởng tự động diễn ra vào lúc **18:00 hằng ngày**."
+    },
+    {
+        title: "📈 CHỨNG KHOÁN & CRYPTO",
+        emoji: "📊",
+        description: "Thị trường giao dịch tài sản mã hóa và coin ảo:\n\n" +
+            "• `!coin`: Mở bảng thông tin thị trường kèm 4 nút bấm tương tác (Mua, Bán, Biểu đồ, Ví)\n" +
+            "• `!coin chart <MÃ>`: Xem biểu đồ kỹ thuật trực tuyến của mã coin (VD: `!coin chart BTC`)\n" +
+            "• `!coin vi`: Xem danh mục đầu tư coin cá nhân sở hữu"
+    },
+    {
+        title: "⚙️ QUẢN TRỊ & HỆ THỐNG",
+        emoji: "🛠️",
+        description: "Khu vực lệnh cấu hình dành riêng cho đội ngũ Quản Trị Viên (Staff / Admin):\n\n" +
+            "• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n" +
+            "• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n" +
+            "• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n" +
+            "• `!setnoitu`: Đặt kênh chơi game Nối Từ\n" +
+            "• `!kqsx`: Ép bot quay thưởng Xổ Số & Lô Đề ngay lập tức\n" +
+            "• `!cong @user <số_tiền>` / `!tru @user <số_tiền>`: Cộng / Trừ tiền người chơi"
+    }
+];
+
+function getHelpComponents(pageIndex = 0) {
+    const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId('help_select_category')
+        .setPlaceholder('📌 Chọn danh mục...')
+        .addOptions(
+            HELP_PAGES.map((page, idx) => 
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(page.title.replace(/^[^\w\s]+\s*/, ''))
+                    .setDescription(page.description.split('\n')[0].slice(0, 100))
+                    .setValue(`help_page_${idx}`)
+                    .setEmoji(page.emoji)
+                    .setDefault(idx === pageIndex)
+            )
+        );
+
+    const rowMenu = new ActionRowBuilder().addComponents(selectMenu);
+
+    const rowButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`help_prev_${pageIndex}`)
+            .setLabel('Trang Trước')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(pageIndex === 0),
+        new ButtonBuilder()
+            .setCustomId(`help_home_${pageIndex}`)
+            .setLabel('Tổng Quan')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(pageIndex === 0),
+        new ButtonBuilder()
+            .setCustomId(`help_next_${pageIndex}`)
+            .setLabel('Trang Sau')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(pageIndex === HELP_PAGES.length - 1)
+    );
+
+    return [rowMenu, rowButtons];
+}
+
+function getHelpEmbed(pageIndex = 0) {
+    const page = HELP_PAGES[pageIndex];
+    return new EmbedBuilder()
+        .setColor('Blurple')
+        .setTitle(`📚 TRỢ GIÚP LỆNH CÁ`)
+        .setDescription(`Xin chào! Bảng hướng dẫn tra cứu cú pháp và tính năng chi tiết.\n\n` +
+            `--- \n\n` +
+            `### ${page.title}\n\n${page.description}`)
+        .setFooter({ text: `Trang ${pageIndex + 1}/${HELP_PAGES.length} • Gõ /trogiup để mở lại bảng này` })
+        .setTimestamp();
+}
 
 async function broadcastCryptoUpdate() {
     let marketText = '';
@@ -621,16 +749,13 @@ async function startTaiXiuLoop(guildId, channelId) {
             await txSession.lastOpenMessage.edit({ components: [disabledRow] }).catch(() => {});
         }
 
-        // CHỈNH TỈ LỆ THẮNG TÀI XỈU XUỐNG 15% (85% RA BÃO HOẶC THUA)
         let d1, d2, d3;
         const isWinRoll = Math.random() < 0.15;
 
         if (!isWinRoll) {
-            // 85% trường hợp ra Bão (Tất cả cược đều thua)
             const sameVal = Math.floor(Math.random() * 6) + 1;
             d1 = sameVal; d2 = sameVal; d3 = sameVal;
         } else {
-            // 15% trường hợp ngẫu nhiên bình thường
             d1 = Math.floor(Math.random() * 6) + 1;
             d2 = Math.floor(Math.random() * 6) + 1;
             d3 = Math.floor(Math.random() * 6) + 1;
@@ -681,7 +806,7 @@ async function startTaiXiuLoop(guildId, channelId) {
     runSession();
 }
 
-client.once('ready', () => {
+client.once('ready', async () => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
     for (const [guildId, guildData] of Object.entries(config)) {
         const channelId = typeof guildData === 'string' ? guildData : guildData?.channelId;
@@ -690,6 +815,26 @@ client.once('ready', () => {
     scheduleDailyLottery();
     scheduleCryptoMarket();
     scheduleHotelTaxes(); 
+
+    // ĐĂNG KÝ SLASH COMMAND /trogiup
+    const commands = [
+        {
+            name: 'trogiup',
+            description: 'Mở bảng hướng dẫn tra cứu lệnh và tính năng của bot'
+        }
+    ];
+
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
+    try {
+        console.log('🔄 Đang đăng ký Slash Commands...');
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commands },
+        );
+        console.log('✅ Đã đăng ký thành công lệnh /trogiup!');
+    } catch (error) {
+        console.error('[Slash Command Register Error]:', error);
+    }
 });
 
 client.on('interactionCreate', async interaction => {
@@ -700,20 +845,61 @@ client.on('interactionCreate', async interaction => {
         const txSession = getSession(guildId);
         const targetChannelId = txSession.channelId;
 
+        // ==========================================
+        // XỬ LÝ SLASH COMMAND /trogiup
+        // ==========================================
+        if (interaction.isChatInputCommand() && interaction.commandName === 'trogiup') {
+            const embed = getHelpEmbed(0);
+            const components = getHelpComponents(0);
+            return interaction.reply({ embeds: [embed], components: components, ephemeral: false });
+        }
+
+        // ==========================================
+        // XỬ LÝ TƯƠNG TÁC HELP MENU & BUTTONS (TRỢ GIÚP)
+        // ==========================================
+        if (interaction.isStringSelectMenu() && interaction.customId === 'help_select_category') {
+            const selectedVal = interaction.values[0]; // VD: help_page_2
+            const pageIndex = parseInt(selectedVal.replace('help_page_', ''), 10);
+            const embed = getHelpEmbed(pageIndex);
+            const components = getHelpComponents(pageIndex);
+            return interaction.update({ embeds: [embed], components: components });
+        }
+
+        if (interaction.isButton() && (interaction.customId.startsWith('help_prev_') || interaction.customId.startsWith('help_next_') || interaction.customId.startsWith('help_home_'))) {
+            const parts = interaction.customId.split('_');
+            const action = parts[1]; // prev, next, home
+            let currentIndex = parseInt(parts[2], 10);
+            let targetIndex = currentIndex;
+
+            if (action === 'prev') targetIndex = Math.max(0, currentIndex - 1);
+            if (action === 'next') targetIndex = Math.min(HELP_PAGES.length - 1, currentIndex + 1);
+            if (action === 'home') targetIndex = 0;
+
+            const embed = getHelpEmbed(targetIndex);
+            const components = getHelpComponents(targetIndex);
+            return interaction.update({ embeds: [embed], components: components });
+        }
+
         // Xử lý nút chọn thuê phòng khách sạn (VIP, Hoàng Gia, Đặc Biệt)
         if (interaction.isButton() && ['hotel_vip', 'hotel_hoanggia', 'hotel_dacbiet'].includes(interaction.customId)) {
             const roomType = interaction.customId === 'hotel_vip' ? 'vip' : (interaction.customId === 'hotel_hoanggia' ? 'hoanggia' : 'dacbiet');
             const roomInfo = HOTEL_PRICES[roomType];
             const userBal = getBalance(user.id);
 
+            // 🛑 CHẶN DÙNG TIỀN VAY ĐỂ THUÊ PHÒNG ĐẶC BIỆT
+            if (roomType === 'dacbiet' && getLoan(user.id) > 0) {
+                return interaction.reply({ 
+                    content: `<a:no:1554602168093507685> Bạn đang có khoản nợ ngân hàng (**${formatMoney(getLoan(user.id))}**). Hệ thống chặn việc sử dụng tiền vay để thuê **Phòng Đặc Biệt**! Vui lòng dùng lệnh \`!trano\` để trả hết nợ trước.`, 
+                    ephemeral: true 
+                });
+            }
+
             if (userBal < roomInfo.price) {
                 return interaction.reply({ content: `<a:no:1554602168093507685> Số dư không đủ để thuê ${roomInfo.name}! Cần **${formatMoney(roomInfo.price)}** nhưng bạn chỉ có **${formatMoney(userBal)}**.`, ephemeral: true });
             }
 
-            // Trừ tiền thuê phòng
             setBalance(user.id, userBal - roomInfo.price);
 
-            // Tặng 50.000.000 VNĐ nếu thuê Phòng Đặc Biệt
             let bonusMsg = '';
             if (roomType === 'dacbiet') {
                 const updatedBal = getBalance(user.id);
@@ -724,18 +910,15 @@ client.on('interactionCreate', async interaction => {
             await interaction.deferReply({ ephemeral: true });
 
             try {
-                // TỰ ĐỘNG TẠO ROLE CHO PHÒNG
                 const roomRole = await interaction.guild.roles.create({
                     name: `Khách Hàng - ${user.username}`,
                     color: roomInfo.color,
                     reason: `Role dành cho người thuê phòng ${roomInfo.name}`
                 });
 
-                // GÁN ROLE CHO NGƯỜI THUÊ PHÒNG
                 const member = await interaction.guild.members.fetch(user.id);
                 await member.roles.add(roomRole);
 
-                // Tạo danh mục riêng cho phòng
                 const category = await interaction.guild.channels.create({
                     name: `🏨 Khách Sạn - ${user.username}`,
                     type: ChannelType.GuildCategory,
@@ -751,21 +934,18 @@ client.on('interactionCreate', async interaction => {
                     ]
                 });
 
-                // Tạo kênh chat riêng
                 const textChannel = await interaction.guild.channels.create({
                     name: `💬-phòng-${roomType}`,
                     type: ChannelType.GuildText,
                     parent: category.id
                 });
 
-                // Tạo kênh voice riêng
                 const voiceChannel = await interaction.guild.channels.create({
                     name: `🔊 Voice ${roomInfo.name}`,
                     type: ChannelType.GuildVoice,
                     parent: category.id
                 });
 
-                // Lưu thông tin phòng và roleId vào hệ thống
                 hotelData.rooms[textChannel.id] = {
                     guildId: guildId,
                     ownerId: user.id,
@@ -775,7 +955,6 @@ client.on('interactionCreate', async interaction => {
                 };
                 saveJSONSync(FILES.HOTELS, hotelData);
 
-                // Gửi bảng hướng dẫn chi tiết vào phòng mới tạo
                 const guideEmbed = new EmbedBuilder()
                     .setColor(roomInfo.color)
                     .setTitle(`🏨 HƯỚNG DẪN SỬ DỤNG ${roomInfo.name.toUpperCase()}`)
@@ -885,7 +1064,7 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        if (interaction.isStringSelectMenu()) {
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_coin_')) {
             const customId = interaction.customId;
             const selectedSymbol = interaction.values[0];
             const coin = cryptoMarket.coins[selectedSymbol];
@@ -1003,22 +1182,17 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// CHỈNH TỈ LỆ THẮNG BLACKJACK XUỐNG 15%
 async function finishBlackjackGame(interaction, gameKey, game) {
     const { user, bet, deck, playerHand, dealerHand, timeout } = game;
     if (timeout) clearTimeout(timeout);
 
     let playerScore = calculateHand(playerHand);
-
-    // Tính toán tỉ lệ thắng 15% cho người chơi
     const isPlayerWin = Math.random() < 0.15;
 
     if (!isPlayerWin) {
-        // Tỷ lệ 85%: Ép Nhà cái gian lận bài điểm cao hơn hoặc ép người chơi quắc
         dealerHand.length = 0;
-        dealerHand.push({ suit: '♠️', value: '10' }, { suit: '♦️', value: 'A' }); // Ép Nhà cái ra Blackjack 21 điểm
+        dealerHand.push({ suit: '♠️', value: '10' }, { suit: '♦️', value: 'A' }); 
     } else {
-        // Tỷ lệ 15%: Nhà cái rút bài bình thường
         if (playerScore <= 21) {
             while (calculateHand(dealerHand) < 17) {
                 dealerHand.push(deck.pop());
@@ -1164,9 +1338,6 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // ==========================================
-        // LỆNH THUÊ PHÒNG KHÁCH SẠN
-        // ==========================================
         if (command === 'khachsan' || command === 'thuephong' || command === 'hotel') {
             const embed = new EmbedBuilder()
                 .setColor('Gold')
@@ -1200,9 +1371,6 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed], components: [row] });
         }
 
-        // ==========================================
-        // CÁC LỆNH QUẢN LÝ PHÒNG KHÁCH SẠN (!moi, !duoi, !doiten, !khoa, !mokhoa, !traphong)
-        // ==========================================
         if (command === 'moi') {
             const roomInfo = hotelData.rooms[message.channel.id];
             if (!roomInfo) return message.reply('<a:no:1554602168093507685> Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
@@ -1300,7 +1468,7 @@ client.on('messageCreate', async message => {
                 return message.reply(`<a:yes:1554602231389487125> Đã đổi tên phòng khách sạn thành công thành: **${newName}**!`);
             } catch (err) {
                 console.error('[Room Rename Error]:', err);
-                return message.reply('<a:no:1554602168093507685> Có lỗi xảy ra khi đổi tên phòng (Discord giới hạn số lần đổi tên kênh, hãy thử lại sau ít phút).');
+                return message.reply('<a:no:1554602168093507685> Có lỗi xảy ra khi đổi tên phòng.');
             }
         }
 
@@ -1374,9 +1542,6 @@ client.on('messageCreate', async message => {
             return;
         }
 
-        // ==========================================
-        // CÁC LỆNH ĐẶT CƯỢC LÔ ĐỀ & VÉ SỐ
-        // ==========================================
         if (command === 'lo' || command === 'de') {
             const num = args[0];
             const bet = parseInt(args[1], 10);
@@ -1847,38 +2012,6 @@ client.on('messageCreate', async message => {
             );
 
             return message.reply({ embeds: [embed], components: [row] });
-        }
-
-        if (command === 'hlp' || command === 'giupde' || command === 'help') {
-            const embed = new EmbedBuilder()
-                .setColor('Random')
-                .setTitle('📖 BẢNG HƯỚNG DẪN CÁC LỆNH')
-                .setDescription('Danh sách các lệnh giải trí, tài chính, giao dịch coin và dịch vụ khách sạn:')
-                .addFields(
-                    { 
-                        name: '🏨 Khách Sạn 24/7', 
-                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP, Hoàng Gia hoặc Đặc Biệt\n• `!moi @user`: Mời bạn vào phòng và trao Role phòng\n• `!duoi @user`: Đuổi thành viên và thu hồi Role\n• `!doiten <tên_mới>`: Đổi tên phòng khách sạn\n• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng\n• `!traphong` (hoặc `!checkout`): Trả phòng, gỡ Role và nhận lại **50% tiền VNĐ** vào ví', 
-                        inline: false 
-                    },
-                    { 
-                        name: '💰 Tài Chính & Ngân Hàng', 
-                        value: '• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại\n• `!profile` (hoặc `!pf`): Xem hồ sơ chi tiết, BXH và danh hiệu\n• `!daily`: Điểm danh nhận quà hằng ngày (100.000đ)\n• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia\n• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%, tối đa 1 Tỷ)\n• `!trano <số_tiền|all>`: Trả nợ ngân hàng', 
-                        inline: false 
-                    },
-                    { 
-                        name: '📈 Chứng Khoán & Crypto', 
-                        value: '• `!coin`: Xem bảng giá thị trường kèm bảng 4 nút bấm tương tác\n• `!coin chart <MÃ>`: Xem biểu đồ kỹ thuật trực tuyến (VD: `!coin chart BTC`)\n• `!coin vi`: Xem danh mục đầu tư coin của bạn', 
-                        inline: false 
-                    },
-                    { 
-                        name: '🎲 Game Giải Trí & Lô Đề', 
-                        value: '• `!lo <số_2_chữ_số> <số_tiền>`: Đánh Lô (1 ăn 3.5 mỗi nháy trong 27 giải)\n• `!de <số_2_chữ_số> <số_tiền>`: Đánh Đề (1 ăn 70 Giải Đặc Biệt)\n• `!veso [chữ_số]` (hoặc `!muaveso`): Mua vé số 6 chữ số giá 10.000đ (Trúng 100Tr)\n• `!bj <số_tiền>` (hoặc `!blackjack`): Chơi bài Blackjack (Xì Dách)\n• **Tài Xỉu:** Tham gia cược qua các nút bấm tương tác tại kênh Tài Xỉu\n• **Nối Từ:** Tham gia trực tiếp bằng cách gõ từ ghép 2 tiếng tại kênh Nối Từ (`!noitu reset` để làm mới từ)\n• **Lô Đề / Vé Số:** Tự động quay thưởng vào 18:00 hằng ngày', 
-                        inline: false 
-                    }
-                )
-                .setFooter({ text: 'Hệ thống giải trí và giao dịch trực tuyến' })
-                .setTimestamp();
-            return message.reply({ embeds: [embed] });
         }
 
         if (command === 'hlpa') {
