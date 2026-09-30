@@ -19,7 +19,49 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🌐 Web server HTTP mở tại port ${PORT}`); });  // ========================================== // 2. KHỞI TẠO DISCORD BOT // ========================================== const client = new Client({     intents: [         GatewayIntentBits.Guilds,         GatewayIntentBits.GuildMessages,         GatewayIntentBits.MessageContent,         GatewayIntentBits.GuildVoiceStates     ] });  // CONFIGURATION const PREFIX = '!'; const TOKEN = process.env.TOKEN \vert{}\vert{} 'YOUR_BOT_TOKEN_HERE'; const ADMIN_ID = process.env.ADMIN_ID \vert{}\vert{} '1298727049451540541';   const FILES = {     BALANCES: './balances.json',     TITLES: './titles.json',     CONFIG: './config.json',                WORD_CONFIG: './word_config.json',      LODE_CONFIG: './lode_config.json',      LOTTERY: './lottery.json',              STAFFS: './staffs.json',                ADMINS: './admins.json',                LOANS: './loans.json',                  CRYPTO: './crypto.json',                PORTFOLIO: './portfolio.json',     HOTELS: './hotels.json'            // Thêm file dữ liệu Khách sạn };  // DATA MANAGERS & AUTO-SAVE IMMEDIATELY const loadJSON = (file, isMap = true) => {     if (!fs.existsSync(file)) return isMap ? new Map() : {};     try {         const raw = fs.readFileSync(file, 'utf8');         return isMap ? new Map(JSON.parse(raw)) : JSON.parse(raw);     } catch (err) {         console.error(`[Data Load Error] ${file}:`, err.message);
+    console.log(`🌐 Web server HTTP mở tại port ${PORT}`);
+});
+
+// ==========================================
+// 2. KHỞI TẠO DISCORD BOT
+// ==========================================
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildVoiceStates
+    ]
+});
+
+// CONFIGURATION
+const PREFIX = '!';
+const TOKEN = process.env.TOKEN || 'YOUR_BOT_TOKEN_HERE';
+const ADMIN_ID = process.env.ADMIN_ID || '1298727049451540541'; 
+
+const FILES = {
+    BALANCES: './balances.json',
+    TITLES: './titles.json',
+    CONFIG: './config.json',           
+    WORD_CONFIG: './word_config.json', 
+    LODE_CONFIG: './lode_config.json', 
+    LOTTERY: './lottery.json',         
+    STAFFS: './staffs.json',           
+    ADMINS: './admins.json',           
+    LOANS: './loans.json',             
+    CRYPTO: './crypto.json',           
+    PORTFOLIO: './portfolio.json',
+    HOTELS: './hotels.json'            // Thêm file dữ liệu Khách sạn
+};
+
+// DATA MANAGERS & AUTO-SAVE IMMEDIATELY
+const loadJSON = (file, isMap = true) => {
+    if (!fs.existsSync(file)) return isMap ? new Map() : {};
+    try {
+        const raw = fs.readFileSync(file, 'utf8');
+        return isMap ? new Map(JSON.parse(raw)) : JSON.parse(raw);
+    } catch (err) {
+        console.error(`[Data Load Error] ${file}:`, err.message);
         return isMap ? new Map() : {};
     }
 };
@@ -29,7 +71,53 @@ const saveJSONSync = (file, data) => {
         const serialized = data instanceof Map ? JSON.stringify(Array.from(data.entries()), null, 2) : JSON.stringify(data, null, 2);
         fs.writeFileSync(file, serialized, 'utf8');
     } catch (err) {
-        console.error(`[Data Save Error] ${file}:`, err.message);     } };  let balances = loadJSON(FILES.BALANCES); let customTitles = loadJSON(FILES.TITLES); let config = loadJSON(FILES.CONFIG, false); let wordConfig = loadJSON(FILES.WORD_CONFIG, false); let lodeConfig = loadJSON(FILES.LODE_CONFIG, false); let lotteryData = loadJSON(FILES.LOTTERY, false); let staffList = loadJSON(FILES.STAFFS, false); let adminList = loadJSON(FILES.ADMINS, false); let loans = loadJSON(FILES.LOANS); let cryptoMarket = loadJSON(FILES.CRYPTO, false); let portfolios = loadJSON(FILES.PORTFOLIO); let hotelData = loadJSON(FILES.HOTELS, false); // Quản lý phòng khách sạn đang thuê  if (!lotteryData.tickets) lotteryData.tickets = []; if (!lotteryData.lodeBets) lotteryData.lodeBets = []; if (!lotteryData.lastResult) lotteryData.lastResult = null; if (!Array.isArray(staffList.users)) staffList.users = []; if (!Array.isArray(adminList.users)) adminList.users = []; if (!hotelData.rooms) hotelData.rooms = {}; // Cấu trúc: { channelId: { ownerId, type, price, guildId } }  if (!cryptoMarket.coins) {     cryptoMarket.coins = {         'BTC': { name: 'Bitcoin', price: 100000, history: [100000], change: 0 },         'ETH': { name: 'Ethereum', price: 50000, history: [50000], change: 0 },         'COIN': { name: 'Custom Coin', price: 10000, history: [10000], change: 0 }     };     saveJSONSync(FILES.CRYPTO, cryptoMarket); }  const cryptoAnnounceMessages = new Map(); const dailyCooldown = new Map(); const guildSessions = new Map(); const bjGames = new Map(); const wordGameSessions = new Map(); const dictionaryCache = new Map();  const isBotOwner = (userId) => userId === ADMIN_ID \vert{}\vert{} adminList.users.includes(userId); const isBotStaff = (userId) => isBotOwner(userId) \vert{}\vert{} staffList.users.includes(userId);  async function checkVietnameseWordOnline(word) {     if (dictionaryCache.has(word)) return dictionaryCache.get(word);     try {         const url = `https://vi.wiktionary.org/w/api.php?action=query&titles=${encodeURIComponent(word)}&format=json`;
+        console.error(`[Data Save Error] ${file}:`, err.message);
+    }
+};
+
+let balances = loadJSON(FILES.BALANCES);
+let customTitles = loadJSON(FILES.TITLES);
+let config = loadJSON(FILES.CONFIG, false);
+let wordConfig = loadJSON(FILES.WORD_CONFIG, false);
+let lodeConfig = loadJSON(FILES.LODE_CONFIG, false);
+let lotteryData = loadJSON(FILES.LOTTERY, false);
+let staffList = loadJSON(FILES.STAFFS, false);
+let adminList = loadJSON(FILES.ADMINS, false);
+let loans = loadJSON(FILES.LOANS);
+let cryptoMarket = loadJSON(FILES.CRYPTO, false);
+let portfolios = loadJSON(FILES.PORTFOLIO);
+let hotelData = loadJSON(FILES.HOTELS, false); // Quản lý phòng khách sạn đang thuê
+
+if (!lotteryData.tickets) lotteryData.tickets = [];
+if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
+if (!lotteryData.lastResult) lotteryData.lastResult = null;
+if (!Array.isArray(staffList.users)) staffList.users = [];
+if (!Array.isArray(adminList.users)) adminList.users = [];
+if (!hotelData.rooms) hotelData.rooms = {}; // Cấu trúc: { channelId: { ownerId, type, price, guildId } }
+
+if (!cryptoMarket.coins) {
+    cryptoMarket.coins = {
+        'BTC': { name: 'Bitcoin', price: 100000, history: [100000], change: 0 },
+        'ETH': { name: 'Ethereum', price: 50000, history: [50000], change: 0 },
+        'COIN': { name: 'Custom Coin', price: 10000, history: [10000], change: 0 }
+    };
+    saveJSONSync(FILES.CRYPTO, cryptoMarket);
+}
+
+const cryptoAnnounceMessages = new Map();
+const dailyCooldown = new Map();
+const guildSessions = new Map();
+const bjGames = new Map();
+const wordGameSessions = new Map();
+const dictionaryCache = new Map();
+
+const isBotOwner = (userId) => userId === ADMIN_ID || adminList.users.includes(userId);
+const isBotStaff = (userId) => isBotOwner(userId) || staffList.users.includes(userId);
+
+async function checkVietnameseWordOnline(word) {
+    if (dictionaryCache.has(word)) return dictionaryCache.get(word);
+    try {
+        const url = `https://vi.wiktionary.org/w/api.php?action=query&titles=${encodeURIComponent(word)}&format=json`;
         const response = await fetch(url);
         const data = await response.json();
         const pages = data.query?.pages;
@@ -82,7 +170,9 @@ const getCryptoChartUrl = (symbol, coin) => {
     const chartConfig = {
         type: 'line',
         data: {
-            labels: coin.history.map((_, index) => `P${index + 1}`),             datasets: [{                 label: `Biểu đồ giá ${symbol}`,
+            labels: coin.history.map((_, index) => `P${index + 1}`),
+            datasets: [{
+                label: `Biểu đồ giá ${symbol}`,
                 data: coin.history,
                 borderColor: 'rgb(0, 255, 128)',
                 backgroundColor: 'rgba(0, 255, 128, 0.2)',
@@ -100,7 +190,22 @@ const getCryptoChartUrl = (symbol, coin) => {
             }
         }
     };
-    return `https://quickchart.io/chart?w=500&h=250&bkg=#2f3136&c=${encodeURIComponent(JSON.stringify(chartConfig))}`; };  const getCrypto4ButtonsRow = () => {     return new ActionRowBuilder().addComponents(         new ButtonBuilder().setCustomId('c_menu_buy').setLabel('🛒 Mua Coin').setStyle(ButtonStyle.Success),         new ButtonBuilder().setCustomId('c_menu_sell').setLabel('💰 Bán Coin').setStyle(ButtonStyle.Danger),         new ButtonBuilder().setCustomId('c_menu_chart').setLabel('📈 Xem Biểu Đồ').setStyle(ButtonStyle.Primary),         new ButtonBuilder().setCustomId('c_portfolio').setLabel('💼 Xem Ví').setStyle(ButtonStyle.Secondary)     ); };  const getCoinSelectMenu = (actionType) => {     return new ActionRowBuilder().addComponents(         new StringSelectMenuBuilder()             .setCustomId(`select_coin_${actionType}`)
+    return `https://quickchart.io/chart?w=500&h=250&bkg=#2f3136&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
+};
+
+const getCrypto4ButtonsRow = () => {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('c_menu_buy').setLabel('🛒 Mua Coin').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('c_menu_sell').setLabel('💰 Bán Coin').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('c_menu_chart').setLabel('📈 Xem Biểu Đồ').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('c_portfolio').setLabel('💼 Xem Ví').setStyle(ButtonStyle.Secondary)
+    );
+};
+
+const getCoinSelectMenu = (actionType) => {
+    return new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId(`select_coin_${actionType}`)
             .setPlaceholder('👉 Chọn đồng coin bạn muốn thao tác...')
             .addOptions([
                 new StringSelectMenuOptionBuilder().setLabel('Bitcoin (BTC)').setDescription('Giá: ' + formatMoney(cryptoMarket.coins['BTC'].price)).setValue('BTC').setEmoji('🪙'),
@@ -121,7 +226,72 @@ async function broadcastCryptoUpdate() {
     const embedMarket = new EmbedBuilder()
         .setColor('Blurple')
         .setTitle('📊 BẢN TIN THỊ TRƯỜNG COIN & CHỨNG KHOÁN (TỰ ĐỘNG)')
-        .setDescription(`*Giá thị trường vừa được cập nhật! Tự động làm mới sau mỗi 2 phút.*\n\n${marketText}`)         .setTimestamp();      const row = getCrypto4ButtonsRow();      for (const [guildId, guildData] of Object.entries(config)) {         if (typeof guildData === 'object' && guildData.cryptoChannelId) {             const channel = await client.channels.fetch(guildData.cryptoChannelId).catch(() => null);             if (channel) {                 const oldMsgId = cryptoAnnounceMessages.get(guildId);                 if (oldMsgId) {                     const oldMsg = await channel.messages.fetch(oldMsgId).catch(() => null);                     if (oldMsg) await oldMsg.delete().catch(() => {});                 }                  const newMsg = await channel.send({ embeds: [embedMarket], components: [row] }).catch(() => null);                 if (newMsg) {                     cryptoAnnounceMessages.set(guildId, newMsg.id);                 }             }         }     } }  function updateCryptoPrices() {     for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {         const percentChange = (Math.random() * 0.30) - 0.15;         let newPrice = Math.round(coin.price * (1 + percentChange));         if (newPrice < 1000) newPrice = 1000;          coin.change = Math.round(percentChange * 100);         coin.price = newPrice;         coin.history.push(newPrice);         if (coin.history.length > 10) coin.history.shift();     }     saveJSONSync(FILES.CRYPTO, cryptoMarket);     broadcastCryptoUpdate(); }  function scheduleCryptoMarket() {     setInterval(updateCryptoPrices, 120000); }  // ========================================== // HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN & TỰ ĐỘNG THU THUẾ // ========================================== const HOTEL_PRICES = {     vip: { name: 'Phòng VIP', price: 1500000, tax: 200000 },     hoanggia: { name: 'Phòng Hoàng Gia', price: 5000000, tax: 500000 } };  function scheduleHotelTaxes() {     setInterval(async () => {         for (const [channelId, room] of Object.entries(hotelData.rooms)) {             const guild = client.guilds.cache.get(room.guildId);             if (!guild) continue;              const channel = guild.channels.cache.get(channelId);             const ownerId = room.ownerId;             const taxAmount = HOTEL_PRICES[room.type]?.tax \vert{}\vert{} 200000;              if (channel) {                 const bal = getBalance(ownerId);                 if (bal >= taxAmount) {                     setBalance(ownerId, bal - taxAmount);                     channel.send(`<:notificacao:1554632317228683446> <@${ownerId}> Đã đến hạn đóng thuế phòng khách sạn! Hệ thống đã tự động thu **-${formatMoney(taxAmount)}** phí duy trì phòng.`).catch(() => {});
+        .setDescription(`*Giá thị trường vừa được cập nhật! Tự động làm mới sau mỗi 2 phút.*\n\n${marketText}`)
+        .setTimestamp();
+
+    const row = getCrypto4ButtonsRow();
+
+    for (const [guildId, guildData] of Object.entries(config)) {
+        if (typeof guildData === 'object' && guildData.cryptoChannelId) {
+            const channel = await client.channels.fetch(guildData.cryptoChannelId).catch(() => null);
+            if (channel) {
+                const oldMsgId = cryptoAnnounceMessages.get(guildId);
+                if (oldMsgId) {
+                    const oldMsg = await channel.messages.fetch(oldMsgId).catch(() => null);
+                    if (oldMsg) await oldMsg.delete().catch(() => {});
+                }
+
+                const newMsg = await channel.send({ embeds: [embedMarket], components: [row] }).catch(() => null);
+                if (newMsg) {
+                    cryptoAnnounceMessages.set(guildId, newMsg.id);
+                }
+            }
+        }
+    }
+}
+
+function updateCryptoPrices() {
+    for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
+        const percentChange = (Math.random() * 0.30) - 0.15;
+        let newPrice = Math.round(coin.price * (1 + percentChange));
+        if (newPrice < 1000) newPrice = 1000;
+
+        coin.change = Math.round(percentChange * 100);
+        coin.price = newPrice;
+        coin.history.push(newPrice);
+        if (coin.history.length > 10) coin.history.shift();
+    }
+    saveJSONSync(FILES.CRYPTO, cryptoMarket);
+    broadcastCryptoUpdate();
+}
+
+function scheduleCryptoMarket() {
+    setInterval(updateCryptoPrices, 120000);
+}
+
+// ==========================================
+// HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN & TỰ ĐỘNG THU THUẾ
+// ==========================================
+const HOTEL_PRICES = {
+    vip: { name: 'Phòng VIP', price: 1500000, tax: 200000 },
+    hoanggia: { name: 'Phòng Hoàng Gia', price: 5000000, tax: 500000 }
+};
+
+function scheduleHotelTaxes() {
+    setInterval(async () => {
+        for (const [channelId, room] of Object.entries(hotelData.rooms)) {
+            const guild = client.guilds.cache.get(room.guildId);
+            if (!guild) continue;
+
+            const channel = guild.channels.cache.get(channelId);
+            const ownerId = room.ownerId;
+            const taxAmount = HOTEL_PRICES[room.type]?.tax || 200000;
+
+            if (channel) {
+                const bal = getBalance(ownerId);
+                if (bal >= taxAmount) {
+                    setBalance(ownerId, bal - taxAmount);
+                    channel.send(`<:notificacao:1554632317228683446> <@${ownerId}> Đã đến hạn đóng thuế phòng khách sạn! Hệ thống đã tự động thu **-${formatMoney(taxAmount)}** phí duy trì phòng.`).catch(() => {});
                 } else {
                     channel.send(`<a:aawarn:1554622466297565267> <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi[span_0](start_span)[span_0](end_span)!`).catch(() => {});
                     
@@ -1600,14 +1770,12 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed], components: [row] });
         }
 
-        // ==========================================
-        // LỆNH !hlp (HƯỚNG DẪN BÌNH THƯỜNG CHO THÀNH VIÊN)
-        // ==========================================
+        // LỆNH HƯỚNG DẪN THÀNH VIÊN (!hlp)
         if (command === 'hlp' || command === 'giupde' || command === 'help') {
             const embed = new EmbedBuilder()
                 .setColor('Random')
-                .setTitle('📖 BẢNG HƯỚNG DẪN LỆNH DÀNH CHO THÀNH VIÊN')
-                .setDescription('Danh sách đầy đủ các lệnh giải trí, tài chính, giao dịch coin và tính năng thành viên:')
+                .setTitle('📖 BẢNG HƯỚNG DẪN CÁC LỆNH DÀNH CHO THÀNH VIÊN')
+                .setDescription('Danh sách các lệnh giải trí, tài chính, giao dịch coin và dịch vụ khách sạn:')
                 .addFields(
                     { 
                         name: '🏨 Khách Sạn 24/7', 
@@ -1635,24 +1803,37 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed] });
         }
 
-        // ==========================================
-        // LỆNH !hlpa (HƯỚNG DẪN QUẢN TRỊ DÀNH CHO ADMIN / STAFF)
-        // ==========================================
+        // LỆNH HƯỚNG DẪN ADMIN / STAFF (!hlpa)
         if (command === 'hlpa') {
             if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Bạn không có quyền sử dụng lệnh hướng dẫn Admin này!');
 
             const embed = new EmbedBuilder()
-                .setColor('Gold')
-                .setTitle('⚙️ BẢNG HƯỚNG DẪN LỆNH DÀNH CHO ADMIN / STAFF')
-                .setDescription('Danh sách các lệnh cấu hình, quản trị và kiểm soát hệ thống bot:')
+                .setColor('DarkRed')
+                .setTitle('⚙️ BẢNG LỆNH QUẢN TRỊ (ADMIN & STAFF)')
+                .setDescription('Danh sách các lệnh cấu hình, quản lý hệ thống dành riêng cho đội ngũ Quản Trị Viên:')
                 .addFields(
                     { 
-                        name: '🛠️ Lệnh Quản Trị & Cấu Hình', 
-                        value: '• `!kqsx` (hoặc `!quayso`): Ép bot ra kết quả Xổ Số & Lô Đề ngay lập tức\n• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng (Owner)\n• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!tru @user <số_tiền>`: Trừ tiền của người chơi (Staff+)\n• `!resetmoney @user` (hoặc `all`): Reset ví tiền về mặc định (Owner)\n• `!addadmin @user`: Thêm Admin phụ tối cao (Chỉ Owner gốc)\n• `!removeadmin @user`: Gỡ Admin phụ (Chỉ Owner gốc)\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff (Owner)\n• `!removestaff @user`: Xóa quản trị viên Staff (Owner)\n• `!liststaff`: Xem danh sách Staff\n• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu (Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Owner)', 
+                        name: '🛠️ Cấu Hình Hệ Thống & Kênh', 
+                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!kqsx` (hoặc `!quayso`): Ép bot ra kết quả Xổ Số & Lô Đề ngay lập tức', 
+                        inline: false 
+                    },
+                    { 
+                        name: '💵 Quản Lý Kinh Tế & Thành Viên', 
+                        value: '• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!tru @user <số_tiền>`: Trừ tiền của người chơi (Staff+)\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng (Owner)\n• `!resetmoney @user` (hoặc `all`): Reset ví tiền về mặc định (Owner)', 
+                        inline: false 
+                    },
+                    { 
+                        name: '🛡️ Quản Lý Quyền Hạn (Admin/Staff)', 
+                        value: '• `!addadmin @user`: Thêm Admin phụ tối cao (Chỉ Owner gốc)\n• `!removeadmin @user`: Gỡ Admin phụ (Chỉ Owner gốc)\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff\n• `!removestaff @user`: Xóa quản trị viên Staff\n• `!liststaff`: Xem danh sách Staff', 
+                        inline: false 
+                    },
+                    { 
+                        name: '📦 Sao Lưu & Khôi Phục Dữ Liệu', 
+                        value: '• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu qua tin nhắn riêng (Chỉ Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
                         inline: false 
                     }
                 )
-                .setFooter({ text: 'Khu vực quản trị cấp cao bot' })
+                .setFooter({ text: 'Khu vực bảo mật dành cho Staff/Admin' })
                 .setTimestamp();
             return message.reply({ embeds: [embed] });
         }
