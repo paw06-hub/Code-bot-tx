@@ -38,7 +38,7 @@ const client = new Client({
 // CONFIGURATION
 const PREFIX = '!';
 const TOKEN = process.env.TOKEN || 'YOUR_BOT_TOKEN_HERE';
-const ADMIN_ID = process.env.ADMIN_ID || '1298727049451540541'; 
+const ADMIN_ID = process.env.ADMIN_ID || '1298727049451540541', '1498554147304247296'; 
 
 const FILES = {
     BALANCES: './balances.json',
