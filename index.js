@@ -273,8 +273,8 @@ function scheduleCryptoMarket() {
 // HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN & TỰ ĐỘNG THU THUẾ
 // ==========================================
 const HOTEL_PRICES = {
-    vip: { name: 'Phòng VIP', price: 1500000, tax: 200000 },
-    hoanggia: { name: 'Phòng Hoàng Gia', price: 5000000, tax: 500000 }
+    vip: { name: 'Phòng VIP', price: 500000, tax: 10000 },
+    hoanggia: { name: 'Phòng Hoàng Gia', price: 2000000, tax: 30000 }
 };
 
 function scheduleHotelTaxes() {
