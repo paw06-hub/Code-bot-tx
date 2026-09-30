@@ -342,7 +342,7 @@ function getHelpEmbed(pageIndex = 0) {
     const page = HELP_PAGES[pageIndex];
     return new EmbedBuilder()
         .setColor('Blurple')
-        .setTitle(`📚 TRỢ GIÚP LỆNH CÁ`)
+        .setTitle(`<:nguyenthach:1554876832321372222> Tổng Hợp Lệnh BOT <:nguyenthach:1554876832321372222>`)
         .setDescription(`Xin chào! Bảng hướng dẫn tra cứu cú pháp và tính năng chi tiết.\n\n` +
             `--- \n\n` +
             `### ${page.title}\n\n${page.description}`)
