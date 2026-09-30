@@ -30,7 +30,8 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildVoiceStates
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMembers
     ]
 });
 
@@ -51,7 +52,7 @@ const FILES = {
     LOANS: './loans.json',             
     CRYPTO: './crypto.json',           
     PORTFOLIO: './portfolio.json',
-    HOTELS: './hotels.json'            // Thêm file dữ liệu Khách sạn
+    HOTELS: './hotels.json'            
 };
 
 // DATA MANAGERS & AUTO-SAVE IMMEDIATELY
@@ -86,14 +87,14 @@ let adminList = loadJSON(FILES.ADMINS, false);
 let loans = loadJSON(FILES.LOANS);
 let cryptoMarket = loadJSON(FILES.CRYPTO, false);
 let portfolios = loadJSON(FILES.PORTFOLIO);
-let hotelData = loadJSON(FILES.HOTELS, false); // Quản lý phòng khách sạn đang thuê
+let hotelData = loadJSON(FILES.HOTELS, false); 
 
 if (!lotteryData.tickets) lotteryData.tickets = [];
 if (!lotteryData.lodeBets) lotteryData.lodeBets = [];
 if (!lotteryData.lastResult) lotteryData.lastResult = null;
 if (!Array.isArray(staffList.users)) staffList.users = [];
 if (!Array.isArray(adminList.users)) adminList.users = [];
-if (!hotelData.rooms) hotelData.rooms = {}; // Cấu trúc: { channelId: { ownerId, type, price, guildId } }
+if (!hotelData.rooms) hotelData.rooms = {}; // Cấu trúc: { channelId: { ownerId, type, price, guildId, roleId } }
 
 if (!cryptoMarket.coins) {
     cryptoMarket.coins = {
@@ -149,7 +150,6 @@ const setBalance = (userId, amount) => {
     saveJSONSync(FILES.BALANCES, balances);
 };
 
-// CẤU HÌNH VAY NGÂN HÀNG (1 TỶ)
 const LOAN_INTEREST_RATE = 0.30;
 const MAX_LOAN_LIMIT = 1000000000;
 
@@ -273,8 +273,8 @@ function scheduleCryptoMarket() {
 // HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN & TỰ ĐỘNG THU THUẾ
 // ==========================================
 const HOTEL_PRICES = {
-    vip: { name: 'Phòng VIP', price: 500000, tax: 10000 },
-    hoanggia: { name: 'Phòng Hoàng Gia', price: 2000000, tax: 30000 }
+    vip: { name: 'Phòng VIP', price: 500000, tax: 10000, color: 'Gold' },
+    hoanggia: { name: 'Phòng Hoàng Gia', price: 2000000, tax: 30000, color: 'Purple' }
 };
 
 function scheduleHotelTaxes() {
@@ -293,8 +293,14 @@ function scheduleHotelTaxes() {
                     setBalance(ownerId, bal - taxAmount);
                     channel.send(`<:notificacao:1554632317228683446> <@${ownerId}> Đã đến hạn đóng thuế phòng khách sạn! Hệ thống đã tự động thu **-${formatMoney(taxAmount)}** phí duy trì phòng.`).catch(() => {});
                 } else {
-                    channel.send(`<a:aawarn:1554622466297565267> <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi[span_0](start_span)[span_0](end_span)!`).catch(() => {});
+                    channel.send(`<a:aawarn:1554622466297565267> <@${ownerId}> Không đủ tiền đóng thuế phòng (**${formatMoney(taxAmount)}**). Phòng khách sạn đã bị thu hồi!`).catch(() => {});
                     
+                    // Xóa Role phòng khi bị thu hồi
+                    if (room.roleId) {
+                        const role = guild.roles.cache.get(room.roleId);
+                        if (role) await role.delete().catch(() => {});
+                    }
+
                     const category = channel.parent;
                     if (category) {
                         for (const child of category.children.cache.values()) {
@@ -308,11 +314,15 @@ function scheduleHotelTaxes() {
                     saveJSONSync(FILES.HOTELS, hotelData);
                 }
             } else {
+                if (room.roleId) {
+                    const role = guild.roles.cache.get(room.roleId);
+                    if (role) await role.delete().catch(() => {});
+                }
                 delete hotelData.rooms[channelId];
                 saveJSONSync(FILES.HOTELS, hotelData);
             }
         }
-    }, 3600000); // Kiểm tra và thu thuế mỗi 1 giờ
+    }, 3600000); 
 }
 
 const getWordSession = (guildId) => {
@@ -506,7 +516,7 @@ function scheduleDailyLottery() {
     }, 10000);
 }
 
-const SUITS = ['♠️', '♥️', '♦️', '♣'];
+const SUITS = ['♠️', '♥️️', '♦️', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 const createDeck = () => {
@@ -692,6 +702,17 @@ client.on('interactionCreate', async interaction => {
             await interaction.deferReply({ ephemeral: true });
 
             try {
+                // TỰ ĐỘNG TẠO ROLE CHO PHÒNG
+                const roomRole = await interaction.guild.roles.create({
+                    name: `🔑 Khách - ${user.username}`,
+                    color: roomInfo.color,
+                    reason: `Role dành cho người thuê phòng ${roomInfo.name}`
+                });
+
+                // GÁN ROLE CHO NGƯỜI THUÊ PHÒNG
+                const member = await interaction.guild.members.fetch(user.id);
+                await member.roles.add(roomRole);
+
                 // Tạo danh mục riêng cho phòng
                 const category = await interaction.guild.channels.create({
                     name: `🏨 Khách Sạn - ${user.username}`,
@@ -702,7 +723,7 @@ client.on('interactionCreate', async interaction => {
                             deny: [PermissionFlagsBits.ViewChannel]
                         },
                         {
-                            id: user.id,
+                            id: roomRole.id,
                             allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]
                         }
                     ]
@@ -722,12 +743,13 @@ client.on('interactionCreate', async interaction => {
                     parent: category.id
                 });
 
-                // Lưu thông tin phòng vào hệ thống (Đã lưu kèm theo price gốc để hoàn tiền sau này)
+                // Lưu thông tin phòng và roleId vào hệ thống
                 hotelData.rooms[textChannel.id] = {
                     guildId: guildId,
                     ownerId: user.id,
                     type: roomType,
-                    price: roomInfo.price
+                    price: roomInfo.price,
+                    roleId: roomRole.id
                 };
                 saveJSONSync(FILES.HOTELS, hotelData);
 
@@ -737,17 +759,18 @@ client.on('interactionCreate', async interaction => {
                     .setTitle(`🏨 HƯỚNG DẪN SỬ DỤNG PHÒNG ${roomInfo.name.toUpperCase()}`)
                     .setDescription(`Chào mừng <@${user.id}> đã sở hữu không gian riêng tư thành công! Dưới đây là các đặc quyền và lệnh quản lý phòng của bạn:`)
                     .addFields(
+                        { name: '🏷️ Role Khách Sạn', value: `Bạn đã nhận được Role độc quyền: ${roomRole}`, inline: false },
                         { name: '<:33218colorroledotspackids:1554608256804982854> Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`\n• Đuổi: `!duoi @user`', inline: true },
                         { name: '<a:2902originallyknownas:1554631297035407364> Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
-                        { name: '<a:3642bunpay:1554630887629656115> Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng và nhận lại 50% tiền VNĐ**.', inline: false },
+                        { name: '<a:3642bunpay:1554630887629656115> Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng, gỡ Role và nhận lại 50% tiền VNĐ**.', inline: false },
                         { name: '<:emoji_11:1554594841084690483> Thông tin thuế & Duy trì', value: `• Giá thuê: **${formatMoney(roomInfo.price)}**\n• Phí duy trì: **${formatMoney(roomInfo.tax)} / giờ** (Trừ tự động vào ví).`, inline: false },
-                        { name: '<a:as_warning:1554611415514357760> Lưu ý', value: 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng sẽ tự động bị thu hồi!', inline: false }
+                        { name: '<a:as_warning:1554611415514357760> Lưu ý', value: 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng và Role sẽ tự động bị thu hồi!', inline: false }
                     )
                     .setTimestamp();
 
-                await textChannel.send({ content: `🎉 Chủ nhân <@${user.id}> đã nhận phòng thành công!`, embeds: [guideEmbed] });
+                await textChannel.send({ content: `🎉 Chủ nhân <@${user.id}> đã nhận phòng và Role độc quyền thành công!`, embeds: [guideEmbed] });
 
-                return interaction.editReply({ content: `<a:yes:1554602231389487125> Thuê phòng thành công! Kênh riêng của bạn đã được khởi tạo tại danh mục mới.` });
+                return interaction.editReply({ content: `<a:yes:1554602231389487125> Thuê phòng thành công! Kênh riêng và Role ${roomRole} đã được cấp cho bạn.` });
             } catch (err) {
                 console.error('[Hotel Creation Error]:', err);
                 return interaction.editReply({ content: '<a:no:1554602168093507685> Có lỗi xảy ra khi tạo phòng tự động. Vui lòng thử lại sau!' });
@@ -1108,7 +1131,7 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-                // ==========================================
+        // ==========================================
         // LỆNH THUÊ PHÒNG KHÁCH SẠN
         // ==========================================
         if (command === 'khachsan' || command === 'thuephong' || command === 'hotel') {
@@ -1116,7 +1139,7 @@ client.on('messageCreate', async message => {
                 .setColor('Gold')
                 .setTitle('🏨 HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN 24/7')
                 .setDescription(
-                    `Thuê phòng riêng tư để nhận ngay **Danh mục, Kênh Chat và Kênh Voice độc quyền**!\n\n` +
+                    `Thuê phòng riêng tư để nhận ngay **Danh mục, Role độc quyền, Kênh Chat và Kênh Voice riêng**!\n\n` +
                     `• **${HOTEL_PRICES.vip.name}:** \`${formatMoney(HOTEL_PRICES.vip.price)}\` (Thuế: ${formatMoney(HOTEL_PRICES.vip.tax)}/giờ)\n` +
                     `• **${HOTEL_PRICES.hoanggia.name}:** \`${formatMoney(HOTEL_PRICES.hoanggia.price)}\` (Thuế: ${formatMoney(HOTEL_PRICES.hoanggia.tax)}/giờ)\n\n` +
                     `*Bấm nút bên dưới để chọn phòng muốn thuê:*`
@@ -1142,7 +1165,7 @@ client.on('messageCreate', async message => {
         // CÁC LỆNH QUẢN LÝ PHÒNG KHÁCH SẠN (!moi, !duoi, !doiten, !khoa, !mokhoa, !traphong)
         // ==========================================
         
-        // 1. LỆNH MỜI THÀNH VIÊN VÀO PHÒNG (!moi)
+        // 1. LỆNH MỜI THÀNH VIÊN VÀO PHÒNG (!moi) (BỔ SUNG GÁN ROLE)
         if (command === 'moi') {
             const roomInfo = hotelData.rooms[message.channel.id];
             if (!roomInfo) return message.reply('<a:no:1554602168093507685> Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
@@ -1153,6 +1176,12 @@ client.on('messageCreate', async message => {
             if (targetUser.id === userId) return message.reply('<a:as_warning:1554611415514357760> Bạn chính là chủ phòng rồi mà!');
 
             try {
+                // Cấp Role phòng cho người được mời
+                if (roomInfo.roleId) {
+                    const member = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                    if (member) await member.roles.add(roomInfo.roleId).catch(() => {});
+                }
+
                 await message.channel.permissionOverwrites.create(targetUser.id, {
                     ViewChannel: true,
                     SendMessages: true,
@@ -1171,14 +1200,14 @@ client.on('messageCreate', async message => {
                         }
                     }
                 }
-                return message.reply(`<a:yes:1554602231389487125> Đã mời thành công ${targetUser} vào phòng khách sạn của bạn!`);
+                return message.reply(`<a:yes:1554602231389487125> Đã mời thành công ${targetUser} vào phòng và trao Role khách cho họ!`);
             } catch (err) {
                 console.error('[Room Invite Error]:', err);
                 return message.reply('<a:no:1554602168093507685> Có lỗi xảy ra khi cấp quyền cho thành viên.');
             }
         }
 
-        // 2. LỆNH ĐUỔI THÀNH VIÊN KHỎI PHÒNG (!duoi)
+        // 2. LỆNH ĐUỔI THÀNH VIÊN KHỎI PHÒNG (!duoi) (BỔ SUNG GỠ ROLE)
         if (command === 'duoi') {
             const roomInfo = hotelData.rooms[message.channel.id];
             if (!roomInfo) return message.reply('<a:no:1554602168093507685> Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn** của bạn!');
@@ -1189,6 +1218,12 @@ client.on('messageCreate', async message => {
             if (targetUser.id === userId || targetUser.id === roomInfo.ownerId) return message.reply('<a:as_warning:1554611415514357760> Không thể tự đuổi chính mình hoặc chủ phòng!');
 
             try {
+                // Gỡ Role phòng khỏi người bị đuổi
+                if (roomInfo.roleId) {
+                    const member = await message.guild.members.fetch(targetUser.id).catch(() => null);
+                    if (member) await member.roles.remove(roomInfo.roleId).catch(() => {});
+                }
+
                 await message.channel.permissionOverwrites.delete(targetUser.id);
                 const category = message.channel.parent;
                 if (category) {
@@ -1202,7 +1237,7 @@ client.on('messageCreate', async message => {
                         }
                     }
                 }
-                return message.reply(`<a:yes:1554602231389487125> Đã thu hồi quyền và đuổi ${targetUser} khỏi phòng thành công!`);
+                return message.reply(`<a:yes:1554602231389487125> Đã thu hồi Role, tước quyền và đuổi ${targetUser} khỏi phòng thành công!`);
             } catch (err) {
                 console.error('[Room Kick Error]:', err);
                 return message.reply('<a:no:1554602168093507685> Có lỗi xảy ra khi tước quyền thành viên.');
@@ -1269,24 +1304,27 @@ client.on('messageCreate', async message => {
             }
         }
 
-        // 5. LỆNH TRẢ PHÒNG VÀ HOÀN 50% TIỀN VNĐ (!traphong / !checkout)
+        // 5. LỆNH TRẢ PHÒNG, XÓA ROLE VÀ HOÀN 50% TIỀN VNĐ (!traphong / !checkout)
         if (command === 'traphong' || command === 'checkout') {
             const roomInfo = hotelData.rooms[message.channel.id];
             if (!roomInfo) return message.reply('<a:no:1554602168093507685> Lệnh này chỉ dùng được bên trong **kênh chat phòng khách sạn**!');
             if (roomInfo.ownerId !== userId && !isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Chỉ có **chủ phòng** mới có quyền trả phòng!');
 
-            // Tính 50% tiền hoàn lại dựa trên giá phòng đã thuê
             const refundAmount = Math.floor(roomInfo.price * 0.5);
             const currentBal = getBalance(roomInfo.ownerId);
 
-            // Cộng lại tiền vào ví chủ phòng
             setBalance(roomInfo.ownerId, currentBal + refundAmount);
 
-            await message.reply(`<a:yes:1554602231389487125> Bạn đã tiến hành trả phòng thành công! Hệ thống đã hoàn lại **+${formatMoney(refundAmount)}** (50% giá trị phòng) vào ví của <@${roomInfo.ownerId}>. Danh mục phòng sẽ được xóa sau 3 giây...`);
+            await message.reply(`<a:yes:1554602231389487125> Bạn đã tiến hành trả phòng thành công! Hệ thống đã hoàn lại **+${formatMoney(refundAmount)}** (50% giá trị phòng) vào ví của <@${roomInfo.ownerId}>. Danh mục và Role phòng sẽ được xóa sau 3 giây...`);
 
-            // Xóa toàn bộ kênh và danh mục phòng sau 3 giây
+            // Xóa Role và Danh mục phòng
             setTimeout(async () => {
                 try {
+                    if (roomInfo.roleId) {
+                        const role = message.guild.roles.cache.get(roomInfo.roleId);
+                        if (role) await role.delete().catch(() => {});
+                    }
+
                     const category = message.channel.parent;
                     if (category) {
                         for (const child of category.children.cache.values()) {
@@ -1360,7 +1398,6 @@ client.on('messageCreate', async message => {
             return message.reply(`<:2990_yes:1554602080780689418> Đã mua thành công vé số **${num}** với giá **${formatMoney(TICKET_PRICE)}**! Trúng Giải Đặc Biệt nhận ngay **100.000.000đ**!`);
         }
 
-        // LỆNH ÉP BOT RA KẾT QUẢ SỔ XỐ / LÔ ĐỀ NGAY
         if (['kqsx', 'quayso', 'eplode'].includes(command)) {
             if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Bạn không có quyền ép quay số!');
             
@@ -1599,7 +1636,6 @@ client.on('messageCreate', async message => {
             return message.reply(`<a:yes:1554602231389487125> Đã thiết lập kênh thông báo biến động Crypto tự động tại ${targetChannel}.`);
         }
 
-        // LỆNH VAY TIỀN NGÂN HÀNG (SỬ DỤNG HẠN MỨC 1 TỶ)
         if (command === 'vay' || command === 'vaytien') {
             const amount = parseInt(args[0], 10);
             const currentDebt = getLoan(userId);
@@ -1783,7 +1819,6 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed], components: [row] });
         }
 
-        // LỆNH HƯỚNG DẪN THÀNH VIÊN (!hlp)
         if (command === 'hlp' || command === 'giupde' || command === 'help') {
             const embed = new EmbedBuilder()
                 .setColor('Random')
@@ -1792,7 +1827,7 @@ client.on('messageCreate', async message => {
                 .addFields(
                     { 
                         name: '🏨 Khách Sạn 24/7', 
-                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP (1.5 Tr) hoặc Hoàng Gia (5 Tr)\n• `!moi @user`: Mời bạn vào phòng khách sạn của bạn\n• `!duoi @user`: Đuổi thành viên khỏi phòng khách sạn\n• `!doiten <tên_mới>`: Đổi tên phòng khách sạn\n• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng\n• `!traphong` (hoặc `!checkout`): Trả phòng và nhận lại **50% tiền VNĐ** vào ví', 
+                        value: '• `!khachsan` (hoặc `!thuephong`): Mở giao diện bảng chọn thuê Phòng VIP hoặc Hoàng Gia (Tự động cấp Role mới)\n• `!moi @user`: Mời bạn vào phòng và trao Role phòng\n• `!duoi @user`: Đuổi thành viên và thu hồi Role\n• `!doiten <tên_mới>`: Đổi tên phòng khách sạn\n• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng\n• `!traphong` (hoặc `!checkout`): Trả phòng, gỡ Role và nhận lại **50% tiền VNĐ** vào ví', 
                         inline: false 
                     },
                     { 
@@ -1816,7 +1851,6 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed] });
         }
 
-        // LỆNH HƯỚNG DẪN ADMIN / STAFF (!hlpa)
         if (command === 'hlpa') {
             if (!isBotStaff(userId)) return message.reply('<a:no:1554602168093507685> Bạn không có quyền sử dụng lệnh hướng dẫn Admin này!');
 
@@ -1851,7 +1885,7 @@ client.on('messageCreate', async message => {
             return message.reply({ embeds: [embed] });
         }
 
-                if (command === 'profile' || command === 'pf') {
+        if (command === 'profile' || command === 'pf') {
             const targetUser = message.mentions.users.first() || message.author;
             const bal = getBalance(targetUser.id);
             
@@ -1866,7 +1900,7 @@ client.on('messageCreate', async message => {
                 } else if (isBotStaff(targetUser.id)) {
                     titleText = '<:994180roleadminred:1554607509724209153> Quản Trị Viên';
                 } else {
-                    titleText = '<:Members:1554622922629451828> Member'; // Đã đổi danh hiệu mặc định thành Member ở đây
+                    titleText = '<:Members:1554622922629451828> Member';
                 }
             }
 
@@ -1877,32 +1911,58 @@ client.on('messageCreate', async message => {
                 .addFields(
                     { name: '<:emoji_59:1554662943826776105> Số dư', value: `**${formatMoney(bal)}**`, inline: false },
                     { name: '<:emoji_59:1554662954471915691> BXH Toàn Cầu', value: `**${rankText}**`, inline: false },
-                    { name: '<:emoji_60:1554662976022249623> Danh hiệu', value: `**${titleText}**`, inline: false }
-                );
-            return message.reply({ embeds: [embed] });
-        }
+                    { name: '<:emoji_60:1554662976022249623> Danh hiệu', value: titleText, inline: false }
+                )
+                .setTimestamp();
 
-        if (command === 'balance' || command === 'sodu') {
-            return message.reply(`<:azu_vnd:1554669052033499198> Số dư của bạn: **${formatMoney(getBalance(userId))}**`);
+            return message.reply({ embeds: [embed] });
         }
 
         if (command === 'daily') {
             const now = Date.now();
-            if (now - (dailyCooldown.get(userId) || 0) < 86400000) return message.reply('⏰ Đã điểm danh hôm nay rồi!');
-            setBalance(userId, getBalance(userId) + 100000);
+            const cooldownTime = 86400000; // 24 giờ
+            const lastClaim = dailyCooldown.get(userId) || 0;
+
+            if (now - lastClaim < cooldownTime) {
+                const remainingTime = cooldownTime - (now - lastClaim);
+                const hours = Math.floor(remainingTime / 3600000);
+                const minutes = Math.floor((remainingTime % 3600000) / 60000);
+                return message.reply(`<a:as_warning:1554611415514357760> Bạn đã nhận quà hằng ngày rồi! Vui lòng quay lại sau **${hours} giờ ${minutes} phút**.`);
+            }
+
+            const REWARD = 100000;
+            setBalance(userId, getBalance(userId) + REWARD);
             dailyCooldown.set(userId, now);
-            return message.reply(`🎁 Điểm danh nhận **+100.000đ**!`);
+
+            return message.reply(`<a:yes:1554602231389487125> Bạn đã điểm danh thành công và nhận được **+${formatMoney(REWARD)}**!`);
+        }
+
+        if (command === 'balance' || command === 'sodu') {
+            const bal = getBalance(userId);
+            return message.reply(`💰 Số dư ví hiện tại của bạn: **${formatMoney(bal)}**`);
         }
 
         if (command === 'top' || command === 'bxh') {
             const sorted = Array.from(balances.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
-            let desc = sorted.map(([id, bal], i) => `<:emoji_70:1554668633857327164> **Top ${i + 1}**: <@${id}> - **${formatMoney(bal)}**`).join('\n');
-            const embed = new EmbedBuilder().setTitle('<:emoji_63:1554667500862439555> BẢNG XẾP HẠNG ĐẠI GIA <:emoji_63:1554667500862439555>').setDescription(desc || 'Chưa có dữ liệu.').setColor('Gold');
+            let desc = '';
+            
+            for (let i = 0; i < sorted.length; i++) {
+                const [uId, amount] = sorted[i];
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**#${i + 1}**`;
+                desc += `${medal} <@${uId}>: **${formatMoney(amount)}**\n`;
+            }
+
+            const embed = new EmbedBuilder()
+                .setColor('Gold')
+                .setTitle('🏆 BẢNG XẾP HẠNG ĐẠI GIA')
+                .setDescription(desc || 'Chưa có dữ liệu.')
+                .setTimestamp();
+
             return message.reply({ embeds: [embed] });
         }
 
     } catch (err) {
-        console.error('[Message Error]:', err);
+        console.error('[Command Error]:', err);
     }
 });
 
