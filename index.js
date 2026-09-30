@@ -1118,8 +1118,17 @@ client.on('messageCreate', async message => {
                 .setDescription('Thuê phòng riêng tư để nhận ngay **Danh mục, Kênh Chat và Kênh Voice độc quyền**!\n\n• **Phòng VIP:** `1.500.000đ` (Thuế: 200.000đ/giờ)\n• **Phòng Tổng Thống:** `5.000.000đ` (Thuế: 500.000đ/giờ)\n\n*Bấm nút bên dưới để chọn phòng muốn thuê:*');
 
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('hotel_vip').setLabel('<:lr:1554621025562525788> Thuê Phòng VIP (1.5 Tr)').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('hotel_hoanggia').setLabel('<a:lg:1554620960034791424> Thuê Phòng Tổng Thống (5 Tr)').setStyle(ButtonStyle.Primary)
+                new ButtonBuilder()
+    .setCustomId('hotel_vip')
+    .setEmoji('1554621025562525788')
+    .setLabel('Thuê Phòng VIP (1.5 Tr)')
+    .setStyle(ButtonStyle.Success),
+new ButtonBuilder()
+    .setCustomId('hotel_hoanggia')
+    .setEmoji('1554620960034791424')
+    .setLabel('Thuê Phòng Tổng Thống (5 Tr)')
+    .setStyle(ButtonStyle.Primary)
+
             );
 
             return message.reply({ embeds: [embed], components: [row] });
