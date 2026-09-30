@@ -35,15 +35,10 @@ const client = new Client({
     ]
 });
 
-// CONFIGURATION
+// CONFIGURATION (Hỗ trợ 2 Owner ID)
 const PREFIX = '!';
 const TOKEN = process.env.TOKEN || 'YOUR_BOT_TOKEN_HERE';
-// Thay đổi phần này ở cấu hình đầu code:
-const ADMIN_IDS = ['1298727049451540541', '1498554147304247296']; 
-
-// Thay thế hàm kiểm tra Owner thành:
-const isBotOwner = (userId) => ADMIN_IDS.includes(userId) || adminList.users.includes(userId);
-const isBotStaff = (userId) => isBotOwner(userId) || staffList.users.includes(userId); 
+const ADMIN_IDS = ['1298727049451540541', 'ID_OWNER_THU_HAI_O_DAY']; 
 
 const FILES = {
     BALANCES: './balances.json',
@@ -117,7 +112,8 @@ const bjGames = new Map();
 const wordGameSessions = new Map();
 const dictionaryCache = new Map();
 
-const isBotOwner = (userId) => userId === ADMIN_ID || adminList.users.includes(userId);
+// ĐÃ KHAI BÁO DUY NHẤT Ở ĐÂY ĐỂ TRÁNH LỖI TRÙNG LẶP
+const isBotOwner = (userId) => ADMIN_IDS.includes(userId) || adminList.users.includes(userId);
 const isBotStaff = (userId) => isBotOwner(userId) || staffList.users.includes(userId);
 
 async function checkVietnameseWordOnline(word) {
@@ -299,7 +295,7 @@ const HELP_PAGES = [
             "• `!cong @user <số_tiền>` / `!tru @user <số_tiền>`: Cộng / Trừ tiền người chơi\n" +
             "• `!addstaff @user` / `!removestaff @user`: Thêm / Xóa Quản Trị Viên (Staff)\n" +
             "• `!liststaff`: Xem danh sách toàn bộ Staff\n" +
-            "• `!addadmin @user` / `!removeadmin @user`: Thêm / Xóa Admin phụ (Chỉ Owner)\n" +
+            "• `!addadmin @user` / `!removeadmin @user`: Thêm / Xóa Admin phụ\n" +
             "• `!listadmin`: Xem danh sách Admin"
     }
 ];
@@ -706,7 +702,7 @@ async function updateOpenEmbed(txSession) {
     const embedOpen = new EmbedBuilder()
         .setColor('Gold')
         .setTitle(`🎲 PHIÊN TÀI XỈU #${txSession.sessionNumber}`)
-        .setDescription(`⏱️ Thời gian đặt cược: **40 giây**.\n📊 **SOI CẦU (10 phiên gần nhất):**\n${bridgeText}\n\n👇 **Bấm nút bên dưới để cược!**`)
+        .setDescription(`⏱ Thời gian đặt cược: **40 giây**.\n📊 **SOI CẦU (10 phiên gần nhất):**\n${bridgeText}\n\n👇 **Bấm nút bên dưới để cược!**`)
         .addFields(
             { name: '🔴 CỬA TÀI', value: `💰 **${formatMoney(totalTai)}**\n👥 **${countTai}** người`, inline: true },
             { name: '🔵 CỬA XỈU', value: `💰 **${formatMoney(totalXiu)}**\n👥 **${countXiu}** người`, inline: true }
@@ -734,7 +730,7 @@ async function startTaiXiuLoop(guildId, channelId) {
         const embedOpen = new EmbedBuilder()
             .setColor('Gold')
             .setTitle(`🎲 PHIÊN TÀI XỈU #${txSession.sessionNumber}`)
-            .setDescription(`⏱️️ Thời gian đặt cược: **40 giây**.\n📊 **SOI CẦU (10 phiên gần nhất):**\n${bridgeText}\n\n👇 **Bấm nút bên dưới để cược!**`)
+            .setDescription(`⏱️ Thời gian đặt cược: **40 giây**.\n📊 **SOI CẦU (10 phiên gần nhất):**\n${bridgeText}\n\n👇 **Bấm nút bên dưới để cược!**`)
             .addFields(
                 { name: '🔴 CỬA TÀI', value: '💰 **0đ**\n👥 **0** người', inline: true },
                 { name: '🔵 CỬA XỈU', value: '💰 **0đ**\n👥 **0** người', inline: true }
@@ -1248,7 +1244,7 @@ async function finishBlackjackGame(interaction, gameKey, game) {
 
     if (!isPlayerWin) {
         dealerHand.length = 0;
-        dealerHand.push({ suit: '♠️', value: '10' }, { suit: '♦️', value: 'A' }); 
+        dealerHand.push({ suit: '♠', value: '10' }, { suit: '♦️', value: 'A' }); 
     } else {
         if (playerScore <= 21) {
             while (calculateHand(dealerHand) < 17) {
@@ -1411,12 +1407,11 @@ client.on('messageCreate', async message => {
                 return message.reply('<a:no:1554602168093507685> Hệ thống nạp tiền chưa được cấu hình kênh duyệt trong server này! Vui lòng báo Admin dùng lệnh `!setadminpay` để thiết lập.');
             }
 
-            const bankId = "TPBANK"; // Mã ngân hàng TPBank
-            const accountNo = "31189838888"; // Số tài khoản TPBank của bạn
+            const bankId = "TPBANK"; 
+            const accountNo = "31189838888"; 
             const template = "compact2";
             const addInfo = `NAP ${message.author.username} ${amount}`;
             
-            // Link API tạo VietQR tự động với thông tin TPBank
             const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png?amount=${amount}&addInfo=${encodeURIComponent(addInfo)}`;
 
             const dmEmbed = new EmbedBuilder()
@@ -1438,7 +1433,6 @@ client.on('messageCreate', async message => {
                 return message.reply('<a:no:1554602168093507685> Không thể gửi tin nhắn riêng (DM) cho bạn! Hãy mở cài đặt tin nhắn riêng tư (Direct Messages) của server này rồi thử lại.');
             }
 
-            // GỬI THÔNG BÁO KÈM 2 NÚT DUYỆT / TỪ CHỐI VÀO KÊNH ADMIN CHỈ ĐỊNH
             const adminChannel = await client.channels.fetch(adminPayChannelId).catch(() => null);
             if (adminChannel) {
                 const adminEmbed = new EmbedBuilder()
@@ -1796,12 +1790,12 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'addadmin') {
-            if (userId !== ADMIN_ID) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền thêm Admin!');
+            if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền thêm Admin!');
             const targetUser = message.mentions.users.first();
             if (!targetUser) return message.reply('<a:no:1554602168093507685> Cú pháp: `!addadmin @user`');
 
-            if (targetUser.id === ADMIN_ID) {
-                return message.reply('<a:cb:1554593663567274106> Đây là Owner!');
+            if (ADMIN_IDS.includes(targetUser.id)) {
+                return message.reply('<a:cb:1554593663567274106> Người này là Owner!');
             }
 
             if (adminList.users.includes(targetUser.id)) {
@@ -1814,7 +1808,7 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'removeadmin' || command === 'deladmin') {
-            if (userId !== ADMIN_ID) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền gỡ Admin!');
+            if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Chỉ Owner mới có quyền gỡ Admin!');
             const targetUser = message.mentions.users.first();
             if (!targetUser) return message.reply('<a:no:1554602168093507685> Cú pháp: `!removeadmin @user`');
 
@@ -1831,7 +1825,7 @@ client.on('messageCreate', async message => {
         if (command === 'listadmin' || command === 'admins') {
             if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Bạn không có quyền xem danh sách này!');
             
-            let desc = `<a:Crown:1554608058460676167> **Owner :** <@${ADMIN_ID}>\n`;
+            let desc = `<a:Crown:1554608058460676167> **Owner:**\n` + ADMIN_IDS.map(id => `• <@${id}>`).join('\n') + `\n`;
             if (adminList.users.length > 0) {
                 desc += `<:994180roleadminred:1554607509724209153> **Admin:**\n` + adminList.users.map(id => `• <@${id}>`).join('\n');
             } else {
@@ -2171,7 +2165,7 @@ client.on('messageCreate', async message => {
                     },
                     { 
                         name: '🛡️ Quản Lý Quyền Hạn (Admin/Staff)', 
-                        value: '• `!addadmin @user`: Thêm Admin phụ tối cao (Chỉ Owner gốc)\n• `!removeadmin @user`: Gỡ Admin phụ (Chỉ Owner gốc)\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff\n• `!removestaff @user`: Xóa quản trị viên Staff\n• `!liststaff`: Xem danh sách Staff', 
+                        value: '• `!addadmin @user`: Thêm Admin phụ\n• `!removeadmin @user`: Gỡ Admin phụ\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff\n• `!removestaff @user`: Xóa quản trị viên Staff\n• `!liststaff`: Xem danh sách Staff', 
                         inline: false 
                     },
                     { 
@@ -2195,7 +2189,7 @@ client.on('messageCreate', async message => {
 
             let titleText = customTitles.get(targetUser.id);
             if (!titleText) {
-                if (targetUser.id === ADMIN_ID || adminList.users.includes(targetUser.id)) {
+                if (ADMIN_IDS.includes(targetUser.id) || adminList.users.includes(targetUser.id)) {
                     titleText = 'Quản Trị Tối Cao';
                 } else if (staffList.users.includes(targetUser.id)) {
                     titleText = 'Quản Trị Viên';
@@ -2227,7 +2221,7 @@ client.on('messageCreate', async message => {
                 const remainingTime = TWENTY_FOUR_HOURS - (NOW - cooldown);
                 const hours = Math.floor(remainingTime / (1000 * 60 * 60));
                 const minutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
-                return message.reply(`<a:no:1554602168093507685> Bạn đã điểm danh hôm nay rồi! Vui lòng quay lại sau **${hours} giờ ${minutes} phút**.`);
+                return message.reply(`<a:no:1554602168093507685> Bạn đã điểm danh hôm nhau rồi! Vui lòng quay lại sau **${hours} giờ ${minutes} phút**.`);
             }
 
             const REWARD = 100000;
