@@ -1859,7 +1859,7 @@ client.on('messageCreate', async message => {
 
             const embed = new EmbedBuilder()
                 .setColor('Blurple')
-                .setTitle(`🪪 Profile - ${targetUser.username}`)
+                .setTitle(`<:emoji_62:1554663815193567323> Profile - ${targetUser.username}`)
                 .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: '<:emoji_59:1554662943826776105> Số dư', value: `**${formatMoney(bal)}**`, inline: false },
