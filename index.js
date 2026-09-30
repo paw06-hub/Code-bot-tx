@@ -1870,7 +1870,7 @@ client.on('messageCreate', async message => {
         }
 
         if (command === 'balance' || command === 'sodu') {
-            return message.reply(`💰 Số dư của bạn: **${formatMoney(getBalance(userId))}**`);
+            return message.reply(`<:azu_vnd:1554669052033499198> Số dư của bạn: **${formatMoney(getBalance(userId))}**`);
         }
 
         if (command === 'daily') {
@@ -1883,8 +1883,8 @@ client.on('messageCreate', async message => {
 
         if (command === 'top' || command === 'bxh') {
             const sorted = Array.from(balances.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
-            let desc = sorted.map(([id, bal], i) => `🪙 **Top ${i + 1}**: <@${id}> - **${formatMoney(bal)}**`).join('\n');
-            const embed = new EmbedBuilder().setTitle('🏆 BẢNG XẾP HẠNG ĐẠI GIA').setDescription(desc || 'Chưa có dữ liệu.').setColor('Gold');
+            let desc = sorted.map(([id, bal], i) => `<:emoji_70:1554668633857327164> **Top ${i + 1}**: <@${id}> - **${formatMoney(bal)}**`).join('\n');
+            const embed = new EmbedBuilder().setTitle('<:emoji_63:1554667500862439555> BẢNG XẾP HẠNG ĐẠI GIA <:emoji_63:1554667500862439555>').setDescription(desc || 'Chưa có dữ liệu.').setColor('Gold');
             return message.reply({ embeds: [embed] });
         }
 
