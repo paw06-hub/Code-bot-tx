@@ -269,7 +269,7 @@ const HELP_PAGES = [
         description: "Hệ thống trò chơi may rủi xổ số kiến thiết:\n\n" +
             "• `!lo <số_2_chữ> <tiền>`: Đánh Lô (1 ăn 3.5 mỗi nháy trong 27 giải)\n" +
             "• `!de <số_2_chữ> <tiền>`: Đánh Đề (1 ăn 70 Giải Đặc Biệt)\n" +
-            "• `!veso [6_chữ_số]` (hoặc `!muaveso`): Mua vé số 6 chữ số giá 10.000đ (Trúng 100 Trợn)\n" +
+            "• `!veso [6_chữ_số]` (hoặc `!muaveso`): Mua vé số 6 chữ số giá 10.000đ (Trúng 100 Tr)\n" +
             "• Lịch quay thưởng tự động diễn ra vào lúc **18:00 hằng ngày**."
     },
     {
@@ -281,7 +281,7 @@ const HELP_PAGES = [
             "• `!coin vi`: Xem danh mục đầu tư coin cá nhân sở hữu"
     },
     {
-        title: "⚙️ QUẢN TRỊ & HỆ THỐNG",
+        title: "🛠️ QUẢN TRỊ & HỆ THỐNG",
         emoji: "🛠️",
         description: "Khu vực lệnh cấu hình dành riêng cho đội ngũ Quản Trị Viên (Staff / Admin):\n\n" +
             "• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n" +
@@ -289,7 +289,11 @@ const HELP_PAGES = [
             "• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n" +
             "• `!setnoitu`: Đặt kênh chơi game Nối Từ\n" +
             "• `!kqsx`: Ép bot quay thưởng Xổ Số & Lô Đề ngay lập tức\n" +
-            "• `!cong @user <số_tiền>` / `!tru @user <số_tiền>`: Cộng / Trừ tiền người chơi"
+            "• `!cong @user <số_tiền>` / `!tru @user <số_tiền>`: Cộng / Trừ tiền người chơi\n" +
+            "• `!addstaff @user` / `!removestaff @user`: Thêm / Xóa Quản Trị Viên (Staff)\n" +
+            "• `!liststaff`: Xem danh sách toàn bộ Staff\n" +
+            "• `!addadmin @user` / `!removeadmin @user`: Thêm / Xóa Admin phụ (Chỉ Owner)\n" +
+            "• `!listadmin`: Xem danh sách Admin"
     }
 ];
 
@@ -409,7 +413,7 @@ const HOTEL_PRICES = {
 function scheduleHotelTaxes() {
     setInterval(async () => {
         for (const [channelId, room] of Object.entries(hotelData.rooms)) {
-            if (room.type === 'dacbiet') continue; // Phòng Đặc Biệt sở hữu mãi mãi, miễn phí duy trì
+            if (room.type === 'dacbiet') continue; 
 
             const guild = client.guilds.cache.get(room.guildId);
             if (!guild) continue;
@@ -741,12 +745,10 @@ async function startTaiXiuLoop(guildId, channelId) {
         await new Promise(res => setTimeout(res, 40000));
         txSession.isOpen = false;
 
+        // XÓA BẢNG CƯỢC CŨ NGAY KHI HẾT GIỜ ĐẶT CƯỢC
         if (txSession.lastOpenMessage) {
-            const disabledRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('bet_tai').setLabel('ĐÃ HẾT GIỜ').setStyle(ButtonStyle.Secondary).setDisabled(true),
-                new ButtonBuilder().setCustomId('bet_xiu').setLabel('ĐÃ HẾT GIỜ').setStyle(ButtonStyle.Secondary).setDisabled(true)
-            );
-            await txSession.lastOpenMessage.edit({ components: [disabledRow] }).catch(() => {});
+            await txSession.lastOpenMessage.delete().catch(() => {});
+            txSession.lastOpenMessage = null;
         }
 
         let d1, d2, d3;
@@ -795,11 +797,13 @@ async function startTaiXiuLoop(guildId, channelId) {
             .setDescription(resultText)
             .setTimestamp();
 
+        // GỬI TIN NHẮN KẾT QUẢ (GIỮ LẠI LÀM LỊCH SỬ KẾT QUẢ)
         await channel.send({ embeds: [embedResult] }).catch(() => null);
 
         txSession.sessionNumber++;
         saveTaiXiuState(guildId, txSession);
 
+        // CHUYỂN SANG PHIÊN MỚI SAU 10 GIÂY
         txSession.timeoutId = setTimeout(runSession, 10000);
     };
 
@@ -816,7 +820,6 @@ client.once('ready', async () => {
     scheduleCryptoMarket();
     scheduleHotelTaxes(); 
 
-    // ĐĂNG KÝ SLASH COMMAND /trogiup
     const commands = [
         {
             name: 'trogiup',
@@ -845,20 +848,14 @@ client.on('interactionCreate', async interaction => {
         const txSession = getSession(guildId);
         const targetChannelId = txSession.channelId;
 
-        // ==========================================
-        // XỬ LÝ SLASH COMMAND /trogiup
-        // ==========================================
         if (interaction.isChatInputCommand() && interaction.commandName === 'trogiup') {
             const embed = getHelpEmbed(0);
             const components = getHelpComponents(0);
             return interaction.reply({ embeds: [embed], components: components, ephemeral: false });
         }
 
-        // ==========================================
-        // XỬ LÝ TƯƠNG TÁC HELP MENU & BUTTONS (TRỢ GIÚP)
-        // ==========================================
         if (interaction.isStringSelectMenu() && interaction.customId === 'help_select_category') {
-            const selectedVal = interaction.values[0]; // VD: help_page_2
+            const selectedVal = interaction.values[0]; 
             const pageIndex = parseInt(selectedVal.replace('help_page_', ''), 10);
             const embed = getHelpEmbed(pageIndex);
             const components = getHelpComponents(pageIndex);
@@ -867,7 +864,7 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.isButton() && (interaction.customId.startsWith('help_prev_') || interaction.customId.startsWith('help_next_') || interaction.customId.startsWith('help_home_'))) {
             const parts = interaction.customId.split('_');
-            const action = parts[1]; // prev, next, home
+            const action = parts[1]; 
             let currentIndex = parseInt(parts[2], 10);
             let targetIndex = currentIndex;
 
@@ -880,13 +877,11 @@ client.on('interactionCreate', async interaction => {
             return interaction.update({ embeds: [embed], components: components });
         }
 
-        // Xử lý nút chọn thuê phòng khách sạn (VIP, Hoàng Gia, Đặc Biệt)
         if (interaction.isButton() && ['hotel_vip', 'hotel_hoanggia', 'hotel_dacbiet'].includes(interaction.customId)) {
             const roomType = interaction.customId === 'hotel_vip' ? 'vip' : (interaction.customId === 'hotel_hoanggia' ? 'hoanggia' : 'dacbiet');
             const roomInfo = HOTEL_PRICES[roomType];
             const userBal = getBalance(user.id);
 
-            // 🛑 CHẶN DÙNG TIỀN VAY ĐỂ THUÊ PHÒNG ĐẶC BIỆT
             if (roomType === 'dacbiet' && getLoan(user.id) > 0) {
                 return interaction.reply({ 
                     content: `<a:no:1554602168093507685> Bạn đang có khoản nợ ngân hàng (**${formatMoney(getLoan(user.id))}**). Hệ thống chặn việc sử dụng tiền vay để thuê **Phòng Đặc Biệt**! Vui lòng dùng lệnh \`!trano\` để trả hết nợ trước.`, 
@@ -960,7 +955,7 @@ client.on('interactionCreate', async interaction => {
                     .setTitle(`🏨 HƯỚNG DẪN SỬ DỤNG ${roomInfo.name.toUpperCase()}`)
                     .setDescription(`Chào mừng <@${user.id}> đã sở hữu không gian riêng tư thành công! Dưới đây là các đặc quyền và lệnh quản lý phòng của bạn:${bonusMsg}`)
                     .addFields(
-                        { name: '🏷️ Role Khách Sạn', value: `Bạn đã nhận được Role độc quyền: ${roomRole}`, inline: false },
+                        { name: '🏷️️ Role Khách Sạn', value: `Bạn đã nhận được Role độc quyền: ${roomRole}`, inline: false },
                         { name: '<:33218colorroledotspackids:1554608256804982854> Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`\n• Đuổi: `!duoi @user`', inline: true },
                         { name: '<a:2902originallyknownas:1554631297035407364> Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
                         { name: '<a:3642bunpay:1554630887629656115> Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng, gỡ Role và nhận lại 50% tiền VNĐ**.', inline: false },
