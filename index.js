@@ -1416,7 +1416,7 @@ client.on('messageCreate', async message => {
 
             const dmEmbed = new EmbedBuilder()
                 .setColor('Gold')
-                .setTitle('💳 HƯỚNG DẪN CHUYỂN KHOẢN NẠP TIỀN')
+                .setTitle('<:tp_bank:1554872609966137480> HƯỚNG DẪN CHUYỂN KHOẢN NẠP TIỀN')
                 .setDescription(`Bạn vừa tạo yêu cầu nạp **${formatMoney(amount)}**.\n\nVui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:\n` +
                     `• **Ngân hàng:** TPBank\n` +
                     `• **Số tài khoản:** \`${accountNo}\`\n` +
@@ -1437,7 +1437,7 @@ client.on('messageCreate', async message => {
             if (adminChannel) {
                 const adminEmbed = new EmbedBuilder()
                     .setColor('Yellow')
-                    .setTitle('🔔 YÊU CẦU NẠP TIỀN MỚI CẦN DUYỆT')
+                    .setTitle('<:new:1554872471629463573> YÊU CẦU NẠP TIỀN MỚI CẦN DUYỆT')
                     .setDescription(`• **Người chơi:** ${message.author} (\`${message.author.id}\`)\n• **Số tiền nạp:** **${formatMoney(amount)}**\n• **Nội dung CK:** \`${addInfo}\``)
                     .setTimestamp();
 
@@ -2190,9 +2190,9 @@ client.on('messageCreate', async message => {
             let titleText = customTitles.get(targetUser.id);
             if (!titleText) {
                 if (ADMIN_IDS.includes(targetUser.id) || adminList.users.includes(targetUser.id)) {
-                    titleText = 'Quản Trị Tối Cao';
+                    titleText = '<:owner_badge:1554871336013398109> Founder <:owner_badge:1554871336013398109>';
                 } else if (staffList.users.includes(targetUser.id)) {
-                    titleText = 'Quản Trị Viên';
+                    titleText = '<:34540ownercrownred:1554871548060639292> Quản Trị Viên <:34540ownercrownred:1554871548060639292>';
                 } else {
                     titleText = 'Thành Viên';
                 }
@@ -2200,12 +2200,12 @@ client.on('messageCreate', async message => {
 
             const embed = new EmbedBuilder()
                 .setColor('Gold')
-                .setTitle(`👤 HỒ SƠ CÁ NHÂN - ${targetUser.username}`)
+                .setTitle(`<:emoji_62:1554663815193567323> Profile  - ${targetUser.username}`)
                 .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
                 .addFields(
-                    { name: '💰 Số Dư Ví', value: `**${formatMoney(bal)}**`, inline: true },
-                    { name: '🏆 Xếp Hạng', value: `**${rankText}**`, inline: true },
-                    { name: '🏷️ Danh Hiệu', value: `**${titleText}**`, inline: false }
+                    { name: '<:emoji_59:1554662943826776105> Số Dư Ví', value: `**${formatMoney(bal)}**`, inline: true },
+                    { name: '<:emoji_59:1554662954471915691> Xếp Hạng', value: `**${rankText}**`, inline: true },
+                    { name: '<:emoji_60:1554662976022249623> Danh Hiệu', value: `**${titleText}**`, inline: false }
                 )
                 .setTimestamp();
 
@@ -2233,7 +2233,7 @@ client.on('messageCreate', async message => {
 
         if (command === 'balance' || command === 'sodu') {
             const bal = getBalance(userId);
-            return message.reply(`💰 Số dư hiện tại của bạn là: **${formatMoney(bal)}**`);
+            return message.reply(`<a:pnv_money3:1554870860148375713> Số dư hiện tại của bạn là: **${formatMoney(bal)}**`);
         }
 
         if (command === 'top' || command === 'bxh') {
@@ -2247,7 +2247,7 @@ client.on('messageCreate', async message => {
 
             const embed = new EmbedBuilder()
                 .setColor('Gold')
-                .setTitle('🏆 BẢNG XẾP HẠNG ĐẠI GIA')
+                .setTitle('<:emoji_63:1554667500862439555> BẢNG XẾP HẠNG ĐẠI GIA <:emoji_63:1554667500862439555>')
                 .setDescription(desc || 'Chưa có dữ liệu xếp hạng.')
                 .setTimestamp();
 
