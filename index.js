@@ -726,7 +726,7 @@ client.on('interactionCreate', async interaction => {
             try {
                 // TỰ ĐỘNG TẠO ROLE CHO PHÒNG
                 const roomRole = await interaction.guild.roles.create({
-                    name: `🔑 Khách - ${user.username}`,
+                    name: `Khách Hàng - ${user.username}`,
                     color: roomInfo.color,
                     reason: `Role dành cho người thuê phòng ${roomInfo.name}`
                 });
@@ -1192,7 +1192,7 @@ client.on('messageCreate', async message => {
                     .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                     .setCustomId('hotel_dacbiet')
-                    .setEmoji('👑')
+                    .setEmoji('<a:yg:1554841922525331597>')
                     .setLabel(`Thuê Đặc Biệt (${formatMoney(HOTEL_PRICES.dacbiet.price)})`)
                     .setStyle(ButtonStyle.Danger)
             );
