@@ -223,132 +223,37 @@ const HELP_PAGES = [
     {
         title: "🏠 TỔNG QUAN & HƯỚNG DẪN NHANH",
         emoji: "🏠",
-        description: "Chào mừng bạn đến với hệ thống giải trí.
-
-" +
-            "💡 **Tiền tố lệnh mặc định:** Gõ `!` trước mỗi lệnh (VD: `!balance`, `!daily`, `!nap`...) hoặc dùng Slash commands `/`.
-" +
-            "💰 **Hệ thống tiền tệ:**
-" +
-            "• 🪙 **VNĐ (VNĐ):** Đơn vị tiền tệ chính để đặt cược, nâng cấp, trao đổi và mua sắm.
-" +
-            "• 🎫 **Vé Số:** Dùng để mua vé số trúng thưởng lớn.
-
-" +
-            "📌 **Mẹo dành cho người mới:**
-" +
-            "• `!daily` để nhận quà điểm danh mỗi ngày.
-" +
-            "• `!nap` để nạp tiền vào tài khoản tự động qua QR.
-" +
-            "• `!khachsan` để thuê phòng riêng tư nhận đặc quyền.
-
-" +
-            "👉 Chọn danh mục từ menu thả xuống hoặc bấm nút chuyển trang để xem chi tiết từng nhóm lệnh."
+        description: `Chào mừng bạn đến với hệ thống giải trí.\n\n💡 **Tiền tố lệnh mặc định:** Gõ \`!\` trước mỗi lệnh (VD: \`!balance\`, \`!daily\`, \`!nap\`...) hoặc dùng Slash commands \`/\`.\n💰 **Hệ thống tiền tệ:**\n• 🪙 **VNĐ (VNĐ):** Đơn vị tiền tệ chính để đặt cược, nâng cấp, trao đổi và mua sắm.\n• 🎫 **Vé Số:** Dùng để mua vé số trúng thưởng lớn.\n\n📌 **Mẹo dành cho người mới:**\n• \`!daily\` để nhận quà điểm danh mỗi ngày.\n• \`!nap\` để nạp tiền vào tài khoản tự động qua QR.\n• \`!khachsan\` để thuê phòng riêng tư nhận đặc quyền.\n\n👉 Chọn danh mục từ menu thả xuống hoặc bấm nút chuyển trang để xem chi tiết từng nhóm lệnh.`
     },
     {
         title: "💰 HỆ THỐNG & TÀI CHÍNH",
         emoji: "📜",
-        description: "Danh sách các lệnh quản lý tài chính và tài khoản cá nhân:
-
-" +
-            "• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại
-" +
-            "• `!profile` (hoặc `!pf`): Xem hồ sơ cá nhân, xếp hạng và danh hiệu
-" +
-            "• `!daily`: Điểm danh nhận thưởng hằng ngày (100.000đ)
-" +
-            "• `!nap`: Tạo yêu cầu nạp tiền qua mã QR chuyển khoản
-" +
-            "• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia trong server
-" +
-            "• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%, tối đa 1 Tỷ)
-" +
-            "• `!trano <số_tiền|all>`: Trả nợ ngân hàng"
+        description: `Danh sách các lệnh quản lý tài chính và tài khoản cá nhân:\n\n• \`!balance\` (hoặc \`!sodu\`): Xem số dư ví hiện tại\n• \`!profile\` (hoặc \`!pf\`): Xem hồ sơ cá nhân, xếp hạng và danh hiệu\n• \`!daily\`: Điểm danh nhận thưởng hằng ngày (100.000đ)\n• \`!nap\`: Tạo yêu cầu nạp tiền qua mã QR chuyển khoản\n• \`!top\` (hoặc \`!bxh\`): Xem bảng xếp hạng đại gia trong server\n• \`!vay <số_tiền>\`: Vay tiền ngân hàng (lãi suất 30%, tối đa 1 Tỷ)\n• \`!trano <số_tiền|all>\`: Trả nợ ngân hàng`
     },
     {
         title: "🏨 TIỆN ÍCH KHÁCH SẠN & DỊCH VỤ",
         emoji: "⚙️",
-        description: "Hệ thống thuê phòng khách sạn và quản lý phòng riêng tư 24/7:
-
-" +
-            "• `!khachsan` (hoặc `!thuephong`): Mở bảng giao diện chọn thuê Phòng VIP, Hoàng Gia, Đặc Biệt
-" +
-            "• `!moi @user`: Mời bạn bè vào phòng khách sạn và trao Role
-" +
-            "• `!duoi @user`: Đuổi thành viên khỏi phòng và tước quyền
-" +
-            "• `!doiten <tên_mới>`: Đổi tên hiển thị phòng khách sạn
-" +
-            "• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng với người ngoài
-" +
-            "• `!traphong` (hoặc `!checkout`): Trả phòng, gỡ Role và nhận lại **50% tiền** hoàn lại vào ví"
+        description: `Hệ thống thuê phòng khách sạn và quản lý phòng riêng tư 24/7:\n\n• \`!khachsan\` (hoặc \`!thuephong\`): Mở bảng giao diện chọn thuê Phòng VIP, Hoàng Gia, Đặc Biệt\n• \`!moi @user\`: Mời bạn bè vào phòng khách sạn và trao Role\n• \`!duoi @user\`: Đuổi thành viên khỏi phòng và tước quyền\n• \`!doiten <tên_mới>\`: Đổi tên hiển thị phòng khách sạn\n• \`!khoa\` / \`!mokhoa\`: Khóa hoặc mở khóa phòng với người ngoài\n• \`!traphong\` (hoặc \`!checkout\`): Trả phòng, gỡ Role và nhận lại **50% tiền** hoàn lại vào ví`
     },
     {
         title: "🎲 CASINO & MINIGAMES",
         emoji: "🎲",
-        description: "Danh sách các trò chơi giải trí và cá cược:
-
-" +
-            "• `!bj <số_tiền>` (hoặc `!blackjack`): Chơi bài Blackjack (Xì Dách) đấu với nhà cái
-" +
-            "• **Tài Xỉu:** Tham gia cược Tài Xỉu tự động qua các nút bấm tương tác tại kênh cấu hình
-" +
-            "• **Nối Từ:** Tham gia gõ từ ghép 2 tiếng tại kênh Nối Từ (`!noitu reset` để làm mới)"
+        description: `Danh sách các trò chơi giải trí và cá cược:\n\n• \`!bj <số_tiền>\` (hoặc \`!blackjack\`): Chơi bài Blackjack (Xì Dách) đấu với nhà cái\n• **Tài Xỉu:** Tham gia cược Tài Xỉu tự động qua các nút bấm tương tác tại kênh cấu hình\n• **Nối Từ:** Tham gia gõ từ ghép 2 tiếng tại kênh Nối Từ (\`!noitu reset\` để làm mới)`
     },
     {
         title: "🎟️ XỔ SỐ & LÔ ĐỀ",
         emoji: "🎰",
-        description: "Hệ thống trò chơi may rủi xổ số kiến thiết:
-
-" +
-            "• `!lo <số_2_chữ> <tiền>`: Đánh Lô (1 ăn 3.5 mỗi nháy trong 27 giải)
-" +
-            "• `!de <số_2_chữ> <tiền>`: Đánh Đề (1 ăn 70 Giải Đặc Biệt)
-" +
-            "• `!veso [6_chữ_số]` (hoặc `!muaveso`): Mua vé số 6 chữ số giá 10.000đ (Trúng 100 Tr)
-" +
-            "• Lịch quay thưởng tự động diễn ra vào lúc **18:00 hằng ngày**."
+        description: `Hệ thống trò chơi may rủi xổ số kiến thiết:\n\n• \`!lo <số_2_chữ> <tiền>\`: Đánh Lô (1 ăn 3.5 mỗi nháy trong 27 giải)\n• \`!de <số_2_chữ> <tiền>\`: Đánh Đề (1 ăn 70 Giải Đặc Biệt)\n• \`!veso [6_chữ_số]\` (hoặc \`!muaveso\`): Mua vé số 6 chữ số giá 10.000đ (Trúng 100 Tr)\n• Lịch quay thưởng tự động diễn ra vào lúc **18:00 hằng ngày**.`
     },
     {
         title: "📈 CHỨNG KHOÁN & CRYPTO",
         emoji: "📊",
-        description: "Thị trường giao dịch tài sản mã hóa và coin ảo:
-
-" +
-            "• `!coin`: Mở bảng thông tin thị trường kèm 4 nút bấm tương tác (Mua, Bán, Biểu đồ, Ví)
-" +
-            "• `!coin chart <MÃ>`: Xem biểu đồ kỹ thuật trực tuyến của mã coin (VD: `!coin chart BTC`)
-" +
-            "• `!coin vi`: Xem danh mục đầu tư coin cá nhân sở hữu"
+        description: `Thị trường giao dịch tài sản mã hóa và coin ảo:\n\n• \`!coin\`: Mở bảng thông tin thị trường kèm 4 nút bấm tương tác (Mua, Bán, Biểu đồ, Ví)\n• \`!coin chart <MÃ>\`: Xem biểu đồ kỹ thuật trực tuyến của mã coin (VD: \`!coin chart BTC\`)\n• \`!coin vi\`: Xem danh mục đầu tư coin cá nhân sở hữu`
     },
     {
         title: "🛠️ QUẢN TRỊ & HỆ THỐNG",
         emoji: "🛠️",
-        description: "Khu vực lệnh cấu hình dành riêng cho đội ngũ Quản Trị Viên (Staff / Admin):
-
-" +
-            "• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động
-" +
-            "• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động
-" +
-            "• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề
-" +
-            "• `!setadminpay`: Đặt kênh nhận yêu cầu duyệt nạp tiền
-" +
-            "• `!setnoitu`: Đặt kênh chơi game Nối Từ
-" +
-            "• `!kqsx`: Ép bot quay thưởng Xổ Số & Lô Đề ngay lập tức
-" +
-            "• `!cong @user <số_tiền>` / `!tru @user <số_tiền>`: Cộng / Trừ tiền người chơi
-" +
-            "• `!addstaff @user` / `!removestaff @user`: Thêm / Xóa Quản Trị Viên (Staff)
-" +
-            "• `!liststaff`: Xem danh sách toàn bộ Staff
-" +
-            "• `!addadmin @user` / `!removeadmin @user`: Thêm / Xóa Admin phụ
-" +
-            "• `!listadmin`: Xem danh sách Admin"
+        description: `Khu vực lệnh cấu hình dành riêng cho đội ngũ Quản Trị Viên (Staff / Admin):\n\n• \`!setcoin\`: Đặt kênh thông báo biến động Crypto tự động\n• \`!settaixiu\`: Đặt kênh chơi Tài Xỉu tự động\n• \`!setlode\`: Đặt kênh thông báo Xổ số / Lô đề\n• \`!setadminpay\`: Đặt kênh nhận yêu cầu duyệt nạp tiền\n• \`!setnoitu\`: Đặt kênh chơi game Nối Từ\n• \`!kqsx\`: Ép bot quay thưởng Xổ Số & Lô Đề ngay lập tức\n• \`!cong @user <số_tiền>\` / \`!tru @user <số_tiền>\`: Cộng / Trừ tiền người chơi\n• \`!addstaff @user\` / \`!removestaff @user\`: Thêm / Xóa Quản Trị Viên (Staff)\n• \`!liststaff\`: Xem danh sách toàn bộ Staff\n• \`!addadmin @user\` / \`!removeadmin @user\`: Thêm / Xóa Admin phụ\n• \`!listadmin\`: Xem danh sách Admin`
     }
 ];
 
