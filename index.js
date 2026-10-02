@@ -35,7 +35,6 @@ const client = new Client({
     ]
 });
 
-// CONFIGURATION (Hỗ trợ 2 Owner ID)
 const PREFIX = '!';
 const TOKEN = process.env.TOKEN || 'YOUR_BOT_TOKEN_HERE';
 const ADMIN_IDS = ['1298727049451540541', '1498554147304247296']; 
@@ -55,7 +54,6 @@ const FILES = {
     HOTELS: './hotels.json'            
 };
 
-// DATA MANAGERS & AUTO-SAVE IMMEDIATELY
 const loadJSON = (file, isMap = true) => {
     if (!fs.existsSync(file)) return isMap ? new Map() : {};
     try {
@@ -112,7 +110,6 @@ const bjGames = new Map();
 const wordGameSessions = new Map();
 const dictionaryCache = new Map();
 
-// ĐÃ KHAI BÁO DUY NHẤT Ở ĐÂY ĐỂ TRÁNH LỖI TRÙNG LẶP
 const isBotOwner = (userId) => ADMIN_IDS.includes(userId) || adminList.users.includes(userId);
 const isBotStaff = (userId) => isBotOwner(userId) || staffList.users.includes(userId);
 
@@ -223,37 +220,37 @@ const HELP_PAGES = [
     {
         title: "🏠 TỔNG QUAN & HƯỚNG DẪN NHANH",
         emoji: "🏠",
-        description: `Chào mừng bạn đến với hệ thống giải trí.\n\n💡 **Tiền tố lệnh mặc định:** Gõ \`!\` trước mỗi lệnh (VD: \`!balance\`, \`!daily\`, \`!nap\`...) hoặc dùng Slash commands \`/\`.\n💰 **Hệ thống tiền tệ:**\n• 🪙 **VNĐ (VNĐ):** Đơn vị tiền tệ chính để đặt cược, nâng cấp, trao đổi và mua sắm.\n• 🎫 **Vé Số:** Dùng để mua vé số trúng thưởng lớn.\n\n📌 **Mẹo dành cho người mới:**\n• \`!daily\` để nhận quà điểm danh mỗi ngày.\n• \`!nap\` để nạp tiền vào tài khoản tự động qua QR.\n• \`!khachsan\` để thuê phòng riêng tư nhận đặc quyền.\n\n👉 Chọn danh mục từ menu thả xuống hoặc bấm nút chuyển trang để xem chi tiết từng nhóm lệnh.`
+        description: "Chào mừng bạn đến với hệ thống giải trí.\n\n💡 **Tiền tố lệnh mặc định:** Gõ `!` trước mỗi lệnh (VD: `!balance`, `!daily`, `!nap`...) hoặc dùng Slash commands `/`.\n💰 **Hệ thống tiền tệ:**\n• 🪙 **VNĐ (VNĐ):** Đơn vị tiền tệ chính để đặt cược, nâng cấp, trao đổi và mua sắm.\n• 🎫 **Vé Số:** Dùng để mua vé số trúng thưởng lớn.\n\n📌 **Mẹo dành cho người mới:**\n• `!daily` để nhận quà điểm danh mỗi ngày.\n• `!nap` để nạp tiền vào tài khoản tự động qua QR.\n• `!khachsan` để thuê phòng riêng tư nhận đặc quyền.\n\n👉 Chọn danh mục từ menu thả xuống hoặc bấm nút chuyển trang để xem chi tiết từng nhóm lệnh."
     },
     {
         title: "💰 HỆ THỐNG & TÀI CHÍNH",
         emoji: "📜",
-        description: `Danh sách các lệnh quản lý tài chính và tài khoản cá nhân:\n\n• \`!balance\` (hoặc \`!sodu\`): Xem số dư ví hiện tại\n• \`!profile\` (hoặc \`!pf\`): Xem hồ sơ cá nhân, xếp hạng và danh hiệu\n• \`!daily\`: Điểm danh nhận thưởng hằng ngày (100.000đ)\n• \`!nap\`: Tạo yêu cầu nạp tiền qua mã QR chuyển khoản\n• \`!top\` (hoặc \`!bxh\`): Xem bảng xếp hạng đại gia trong server\n• \`!vay <số_tiền>\`: Vay tiền ngân hàng (lãi suất 30%, tối đa 1 Tỷ)\n• \`!trano <số_tiền|all>\`: Trả nợ ngân hàng`
+        description: "Danh sách các lệnh quản lý tài chính và tài khoản cá nhân:\n\n• `!balance` (hoặc `!sodu`): Xem số dư ví hiện tại\n• `!profile` (hoặc `!pf`): Xem hồ sơ cá nhân, xếp hạng và danh hiệu\n• `!daily`: Điểm danh nhận thưởng hằng ngày (100.000đ)\n• `!nap`: Tạo yêu cầu nạp tiền qua mã QR chuyển khoản\n• `!top` (hoặc `!bxh`): Xem bảng xếp hạng đại gia trong server\n• `!vay <số_tiền>`: Vay tiền ngân hàng (lãi suất 30%, tối đa 1 Tỷ)\n• `!trano <số_tiền|all>`: Trả nợ ngân hàng"
     },
     {
         title: "🏨 TIỆN ÍCH KHÁCH SẠN & DỊCH VỤ",
         emoji: "⚙️",
-        description: `Hệ thống thuê phòng khách sạn và quản lý phòng riêng tư 24/7:\n\n• \`!khachsan\` (hoặc \`!thuephong\`): Mở bảng giao diện chọn thuê Phòng VIP, Hoàng Gia, Đặc Biệt\n• \`!moi @user\`: Mời bạn bè vào phòng khách sạn và trao Role\n• \`!duoi @user\`: Đuổi thành viên khỏi phòng và tước quyền\n• \`!doiten <tên_mới>\`: Đổi tên hiển thị phòng khách sạn\n• \`!khoa\` / \`!mokhoa\`: Khóa hoặc mở khóa phòng với người ngoài\n• \`!traphong\` (hoặc \`!checkout\`): Trả phòng, gỡ Role và nhận lại **50% tiền** hoàn lại vào ví`
+        description: "Hệ thống thuê phòng khách sạn và quản lý phòng riêng tư 24/7:\n\n• `!khachsan` (hoặc `!thuephong`): Mở bảng giao diện chọn thuê Phòng VIP, Hoàng Gia, Đặc Biệt\n• `!moi @user`: Mời bạn bè vào phòng khách sạn và trao Role\n• `!duoi @user`: Đuổi thành viên khỏi phòng và tước quyền\n• `!doiten <tên_mới>`: Đổi tên hiển thị phòng khách sạn\n• `!khoa` / `!mokhoa`: Khóa hoặc mở khóa phòng với người ngoài\n• `!traphong` (hoặc `!checkout`): Trả phòng, gỡ Role và nhận lại **50% tiền** hoàn lại vào ví"
     },
     {
         title: "🎲 CASINO & MINIGAMES",
         emoji: "🎲",
-        description: `Danh sách các trò chơi giải trí và cá cược:\n\n• \`!bj <số_tiền>\` (hoặc \`!blackjack\`): Chơi bài Blackjack (Xì Dách) đấu với nhà cái\n• **Tài Xỉu:** Tham gia cược Tài Xỉu tự động qua các nút bấm tương tác tại kênh cấu hình\n• **Nối Từ:** Tham gia gõ từ ghép 2 tiếng tại kênh Nối Từ (\`!noitu reset\` để làm mới)`
+        description: "Danh sách các trò chơi giải trí và cá cược:\n\n• `!bj <số_tiền>` (hoặc `!blackjack`): Chơi bài Blackjack (Xì Dách) đấu với nhà cái\n• **Tài Xỉu:** Tham gia cược Tài Xỉu tự động qua các nút bấm tương tác tại kênh cấu hình\n• **Nối Từ:** Tham gia gõ từ ghép 2 tiếng tại kênh Nối Từ (`!noitu reset` để làm mới)"
     },
     {
         title: "🎟️ XỔ SỐ & LÔ ĐỀ",
         emoji: "🎰",
-        description: `Hệ thống trò chơi may rủi xổ số kiến thiết:\n\n• \`!lo <số_2_chữ> <tiền>\`: Đánh Lô (1 ăn 3.5 mỗi nháy trong 27 giải)\n• \`!de <số_2_chữ> <tiền>\`: Đánh Đề (1 ăn 70 Giải Đặc Biệt)\n• \`!veso [6_chữ_số]\` (hoặc \`!muaveso\`): Mua vé số 6 chữ số giá 10.000đ (Trúng 100 Tr)\n• Lịch quay thưởng tự động diễn ra vào lúc **18:00 hằng ngày**.`
+        description: "Hệ thống trò chơi may rủi xổ số kiến thiết:\n\n• `!lo <số_2_chữ> <tiền>`: Đánh Lô (1 ăn 3.5 mỗi nháy trong 27 giải)\n• `!de <số_2_chữ> <tiền>`: Đánh Đề (1 ăn 70 Giải Đặc Biệt)\n• `!veso [6_chữ_số]` (hoặc `!muaveso`): Mua vé số 6 chữ số giá 10.000đ (Trúng 100 Tr)\n• Lịch quay thưởng tự động diễn ra vào lúc **18:00 hằng ngày**."
     },
     {
         title: "📈 CHỨNG KHOÁN & CRYPTO",
         emoji: "📊",
-        description: `Thị trường giao dịch tài sản mã hóa và coin ảo:\n\n• \`!coin\`: Mở bảng thông tin thị trường kèm 4 nút bấm tương tác (Mua, Bán, Biểu đồ, Ví)\n• \`!coin chart <MÃ>\`: Xem biểu đồ kỹ thuật trực tuyến của mã coin (VD: \`!coin chart BTC\`)\n• \`!coin vi\`: Xem danh mục đầu tư coin cá nhân sở hữu`
+        description: "Thị trường giao dịch tài sản mã hóa và coin ảo:\n\n• `!coin`: Mở bảng thông tin thị trường kèm 4 nút bấm tương tác (Mua, Bán, Biểu đồ, Ví)\n• `!coin chart <MÃ>`: Xem biểu đồ kỹ thuật trực tuyến của mã coin (VD: `!coin chart BTC`)\n• `!coin vi`: Xem danh mục đầu tư coin cá nhân sở hữu"
     },
     {
         title: "🛠️ QUẢN TRỊ & HỆ THỐNG",
         emoji: "🛠️",
-        description: `Khu vực lệnh cấu hình dành riêng cho đội ngũ Quản Trị Viên (Staff / Admin):\n\n• \`!setcoin\`: Đặt kênh thông báo biến động Crypto tự động\n• \`!settaixiu\`: Đặt kênh chơi Tài Xỉu tự động\n• \`!setlode\`: Đặt kênh thông báo Xổ số / Lô đề\n• \`!setadminpay\`: Đặt kênh nhận yêu cầu duyệt nạp tiền\n• \`!setnoitu\`: Đặt kênh chơi game Nối Từ\n• \`!kqsx\`: Ép bot quay thưởng Xổ Số & Lô Đề ngay lập tức\n• \`!cong @user <số_tiền>\` / \`!tru @user <số_tiền>\`: Cộng / Trừ tiền người chơi\n• \`!addstaff @user\` / \`!removestaff @user\`: Thêm / Xóa Quản Trị Viên (Staff)\n• \`!liststaff\`: Xem danh sách toàn bộ Staff\n• \`!addadmin @user\` / \`!removeadmin @user\`: Thêm / Xóa Admin phụ\n• \`!listadmin\`: Xem danh sách Admin`
+        description: "Khu vực lệnh cấu hình dành riêng cho đội ngũ Quản Trị Viên (Staff / Admin):\n\n• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setadminpay`: Đặt kênh nhận yêu cầu duyệt nạp tiền\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!kqsx`: Ép bot quay thưởng Xổ Số & Lô Đề ngay lập tức\n• `!cong @user <số_tiền>` / `!tru @user <số_tiền>`: Cộng / Trừ tiền người chơi\n• `!addstaff @user` / `!removestaff @user`: Thêm / Xóa Quản Trị Viên (Staff)\n• `!liststaff`: Xem danh sách toàn bộ Staff\n• `!addadmin @user` / `!removeadmin @user`: Thêm / Xóa Admin phụ\n• `!listadmin`: Xem danh sách Admin"
     }
 ];
 
@@ -265,8 +262,7 @@ function getHelpComponents(pageIndex = 0) {
             HELP_PAGES.map((page, idx) => 
                 new StringSelectMenuOptionBuilder()
                     .setLabel(page.title.replace(/^[^\w\s]+\s*/, ''))
-                    .setDescription(page.description.split('
-')[0].slice(0, 100))
+                    .setDescription(page.description.split('\n')[0].slice(0, 100))
                     .setValue(`help_page_${idx}`)
                     .setEmoji(page.emoji)
                     .setDefault(idx === pageIndex)
@@ -301,15 +297,7 @@ function getHelpEmbed(pageIndex = 0) {
     return new EmbedBuilder()
         .setColor('Blurple')
         .setTitle(`<:nguyenthach:1554876832321372222> Tổng Hợp Lệnh BOT <:nguyenthach:1554876832321372222>`)
-        .setDescription(`Xin chào! Bảng hướng dẫn tra cứu cú pháp và tính năng chi tiết.
-
-` +
-            `--- 
-
-` +
-            `### ${page.title}
-
-${page.description}`)
+        .setDescription(`Xin chào! Bảng hướng dẫn tra cứu cú pháp và tính năng chi tiết.\n\n--- \n\n### ${page.title}\n\n${page.description.replace(/\\n/g, '\n')}`)
         .setFooter({ text: `Trang ${pageIndex + 1}/${HELP_PAGES.length} • Gõ /trogiup để mở lại bảng này` })
         .setTimestamp();
 }
@@ -319,16 +307,13 @@ async function broadcastCryptoUpdate() {
     for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
         const trendEmoji = coin.change > 0 ? '<:stonks:1554601546820493472> ▲' : (coin.change < 0 ? '<:notstonks:1554601468810756266> ▼' : '🟡 ➖');
         const sign = coin.change > 0 ? '+' : '';
-        marketText += `${trendEmoji} **${coin.name} (${symbol})**: **${formatMoney(coin.price)}** (${sign}${coin.change}%)
-`;
+        marketText += `${trendEmoji} **${coin.name} (${symbol})**: **${formatMoney(coin.price)}** (${sign}${coin.change}%)\n`;
     }
 
     const embedMarket = new EmbedBuilder()
         .setColor('Blurple')
         .setTitle('📊 BẢN TIN THỊ TRƯỜNG COIN & CHỨNG KHOÁN (TỰ ĐỘNG)')
-        .setDescription(`*Giá thị trường vừa được cập nhật! Tự động làm mới sau mỗi 2 phút.*
-
-${marketText}`)
+        .setDescription(`*Giá thị trường vừa được cập nhật! Tự động làm mới sau mỗi 2 phút.*\n\n${marketText}`)
         .setTimestamp();
 
     const row = getCrypto4ButtonsRow();
@@ -371,9 +356,6 @@ function scheduleCryptoMarket() {
     setInterval(updateCryptoPrices, 120000);
 }
 
-// ==========================================
-// HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN & TỰ ĐỘNG THU THUẾ
-// ==========================================
 const HOTEL_PRICES = {
     vip: { name: 'Phòng VIP', price: 500000, tax: 10000, color: 'Gold' },
     hoanggia: { name: 'Phòng Hoàng Gia', price: 2000000, tax: 30000, color: 'Purple' },
@@ -446,17 +428,15 @@ const startWordGameTimeout = (guildId, channel) => {
     const session = getWordSession(guildId);
     if (session.timeoutId) clearTimeout(session.timeoutId);
 
-    // Tăng thời gian chờ timeout lên 5 phút (300,000 ms) và giảm phạt xuống 0 (hoặc 500đ)
     session.timeoutId = setTimeout(async () => {
         const lastUser = session.lastUserId;
-        const PENALTY_TIMEOUT = 0; // Đã giảm phạt timeout về 0đ để dễ chơi hơn
+        const PENALTY_TIMEOUT = 0;
 
         let penaltyMsg = '';
         if (lastUser && PENALTY_TIMEOUT > 0) {
             const currentBal = getBalance(lastUser);
             setBalance(lastUser, currentBal - PENALTY_TIMEOUT);
-            penaltyMsg = `
-💥 <@${lastUser}> bị phạt **-${formatMoney(PENALTY_TIMEOUT)}** vì để ván đấu bị gián đoạn quá 5 phút!`;
+            penaltyMsg = `\n💥 <@${lastUser}> bị phạt **-${formatMoney(PENALTY_TIMEOUT)}** vì để ván đấu bị gián đoạn quá 5 phút!`;
         }
 
         const newWord = START_WORDS[Math.floor(Math.random() * START_WORDS.length)];
@@ -465,8 +445,7 @@ const startWordGameTimeout = (guildId, channel) => {
         session.usedWords = new Set([newWord]);
         session.timeoutId = null;
 
-        await channel.send(`⏳ **Đã quá 5 phút không có ai nối từ!**${penaltyMsg}
-🔄 **Bắt đầu ván mới với từ:** **"${newWord}"**`).catch(() => {});
+        await channel.send(`⏳ **Đã quá 5 phút không có ai nối từ!**${penaltyMsg}\n🔄 **Bắt đầu ván mới với từ:** **"${newWord}"**`).catch(() => {});
     }, 300000);
 };
 
@@ -583,10 +562,8 @@ async function processLotteryDraw(isManual = false) {
             { name: '🏆 Giải Đặc Biệt (Vé Số)', value: `🎉 **${result.specialPrize}**`, inline: false },
             { name: '🎯 Số Đề (2 số cuối GĐB)', value: `🔥 **${specialDe}**`, inline: true },
             { name: '🎲 Kết Quả 27 Giải Lô', value: `\`${result.loResults.join(' - ')}\``, inline: false },
-            { name: '🎉 Người Trúng Vé Số', value: ticketWinners.length > 0 ? ticketWinners.join('
-') : 'Không có ai trúng vé số.', inline: false },
-            { name: '💰 Người Trúng Lô Đề', value: lodeWinners.length > 0 ? lodeWinners.join('
-') : 'Không có ai trúng Lô Đề.', inline: false }
+            { name: '🎉 Người Trúng Vé Số', value: ticketWinners.length > 0 ? ticketWinners.join('\n') : 'Không có ai trúng vé số.', inline: false },
+            { name: '💰 Người Trúng Lô Đề', value: lodeWinners.length > 0 ? lodeWinners.join('\n') : 'Không có ai trúng Lô Đề.', inline: false }
         )
         .setTimestamp();
 
@@ -674,16 +651,10 @@ async function updateOpenEmbed(txSession) {
     const embedOpen = new EmbedBuilder()
         .setColor('Gold')
         .setTitle(`🎲 PHIÊN TÀI XỈU #${txSession.sessionNumber}`)
-        .setDescription(`⏱ Thời gian đặt cược: **40 giây**.
-📊 **SOI CẦU (10 phiên gần nhất):**
-${bridgeText}
-
-👇 **Bấm nút bên dưới để cược!**`)
+        .setDescription(`⏱ Thời gian đặt cược: **40 giây**.\n📊 **SOI CẦU (10 phiên gần nhất):**\n${bridgeText}\n\n👇 **Bấm nút bên dưới để cược!**`)
         .addFields(
-            { name: '🔴 CỬA TÀI', value: `💰 **${formatMoney(totalTai)}**
-👥 **${countTai}** người`, inline: true },
-            { name: '🔵 CỬA XỈU', value: `💰 **${formatMoney(totalXiu)}**
-👥 **${countXiu}** người`, inline: true }
+            { name: '🔴 CỬA TÀI', value: `💰 **${formatMoney(totalTai)}**\n👥 **${countTai}** người`, inline: true },
+            { name: '🔵 CỬA XỈU', value: `💰 **${formatMoney(totalXiu)}**\n👥 **${countXiu}** người`, inline: true }
         )
         .setTimestamp();
 
@@ -708,16 +679,10 @@ async function startTaiXiuLoop(guildId, channelId) {
         const embedOpen = new EmbedBuilder()
             .setColor('Gold')
             .setTitle(`🎲 PHIÊN TÀI XỈU #${txSession.sessionNumber}`)
-            .setDescription(`⏱️ Thời gian đặt cược: **40 giây**.
-📊 **SOI CẦU (10 phiên gần nhất):**
-${bridgeText}
-
-👇 **Bấm nút bên dưới để cược!**`)
+            .setDescription(`⏱️ Thời gian đặt cược: **40 giây**.\n📊 **SOI CẦU (10 phiên gần nhất):**\n${bridgeText}\n\n👇 **Bấm nút bên dưới để cược!**`)
             .addFields(
-                { name: '🔴 CỬA TÀI', value: '💰 **0đ**
-👥 **0** người', inline: true },
-                { name: '🔵 CỬA XỈU', value: '💰 **0đ**
-👥 **0** người', inline: true }
+                { name: '🔴 CỬA TÀI', value: '💰 **0đ**\n👥 **0** người', inline: true },
+                { name: '🔵 CỬA XỈU', value: '💰 **0đ**\n👥 **0** người', inline: true }
             )
             .setTimestamp();
 
@@ -756,11 +721,8 @@ ${bridgeText}
         if (txSession.history.length > 10) txSession.history.shift();
 
         const { totalTai, totalXiu } = getSessionStats(txSession);
-        let resultText = `🎲 Kết quả: **${d1} - ${d2} - ${d3}** (Tổng: **${sum}** - **${res === 'bao' ? 'BÃO' : res.toUpperCase()}**)
-`;
-        resultText += `📊 Tổng cược: 🔴 **${formatMoney(totalTai)}** | 🔵 **${formatMoney(totalXiu)}**
-
-`;
+        let resultText = `🎲 Kết quả: **${d1} - ${d2} - ${d3}** (Tổng: **${sum}** - **${res === 'bao' ? 'BÃO' : res.toUpperCase()}**)\n`;
+        resultText += `📊 Tổng cược: 🔴 **${formatMoney(totalTai)}** | 🔵 **${formatMoney(totalXiu)}**\n\n`;
 
         if (txSession.bets.size === 0) {
             resultText += '😢 Không có ai tham gia cược!';
@@ -769,16 +731,13 @@ ${bridgeText}
                 let bal = getBalance(userId);
                 if (res === 'bao') {
                     setBalance(userId, bal - betData.amount);
-                    resultText += `❌ <@${userId}> cược ${betData.choice.toUpperCase()} (${formatMoney(betData.amount)}) gặp BÃO!
-`;
+                    resultText += `❌ <@${userId}> cược ${betData.choice.toUpperCase()} (${formatMoney(betData.amount)}) gặp BÃO!\n`;
                 } else if (res === betData.choice) {
                     setBalance(userId, bal + betData.amount);
-                    resultText += `🎉 <@${userId}> thắng **+${formatMoney(betData.amount)}** (${betData.choice.toUpperCase()})
-`;
+                    resultText += `🎉 <@${userId}> thắng **+${formatMoney(betData.amount)}** (${betData.choice.toUpperCase()})\n`;
                 } else {
                     setBalance(userId, bal - betData.amount);
-                    resultText += `😢 <@${userId}> thua **-${formatMoney(betData.amount)}** (${betData.choice.toUpperCase()})
-`;
+                    resultText += `😢 <@${userId}> thua **-${formatMoney(betData.amount)}** (${betData.choice.toUpperCase()})\n`;
                 }
             }
         }
@@ -867,16 +826,13 @@ client.on('interactionCreate', async interaction => {
             return interaction.update({ embeds: [embed], components: components });
         }
 
-        // ==========================================
-        // XỬ LÝ NÚT DUYỆT / TỪ CHỐI NẠP TIỀN
-        // ==========================================
         if (interaction.isButton() && (interaction.customId.startsWith('pay_approve_') || interaction.customId.startsWith('pay_reject_'))) {
             if (!isBotStaff(user.id)) {
                 return interaction.reply({ content: '<a:no:1554602168093507685> Bạn không có quyền duyệt giao dịch nạp tiền!', ephemeral: true });
             }
 
             const parts = interaction.customId.split('_');
-            const action = parts[1]; // approve hoặc reject
+            const action = parts[1];
             const targetUserId = parts[2];
             const amount = parseInt(parts[3], 10);
 
@@ -947,8 +903,7 @@ client.on('interactionCreate', async interaction => {
             if (roomType === 'dacbiet') {
                 const updatedBal = getBalance(user.id);
                 setBalance(user.id, updatedBal + roomInfo.reward);
-                bonusMsg = `
-🎁 **ĐẶC QUYỀN ĐẶC BIỆT:** Bạn được thưởng ngay **+${formatMoney(roomInfo.reward)}** vào ví tiền!`;
+                bonusMsg = `\n🎁 **ĐẶC QUYỀN ĐẶC BIỆT:** Bạn được thưởng ngay **+${formatMoney(roomInfo.reward)}** vào ví tiền!`;
             }
 
             await interaction.deferReply({ ephemeral: true });
@@ -1005,14 +960,10 @@ client.on('interactionCreate', async interaction => {
                     .setDescription(`Chào mừng <@${user.id}> đã sở hữu không gian riêng tư thành công! Dưới đây là các đặc quyền và lệnh quản lý phòng của bạn:${bonusMsg}`)
                     .addFields(
                         { name: '🏷 Role Khách Sạn', value: `Bạn đã nhận được Role độc quyền: ${roomRole}`, inline: false },
-                        { name: '<:33218colorroledotspackids:1554608256804982854> Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`
-• Đuổi: `!duoi @user`', inline: true },
-                        { name: '<a:2902originallyknownas:1554631297035407364> Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`
-• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
+                        { name: '<:33218colorroledotspackids:1554608256804982854> Mời & Đuổi bạn bè', value: '• Mời: `!moi @user`\n• Đuổi: `!duoi @user`', inline: true },
+                        { name: '<a:2902originallyknownas:1554631297035407364> Đổi tên & Khóa phòng', value: '• Đổi tên: `!doiten <tên>`\n• Khóa/Mở: `!khoa` / `!mokhoa`', inline: true },
                         { name: '<a:3642bunpay:1554630887629656115> Trả phòng & Nhận hoàn tiền', value: '• Gõ `!traphong` (hoặc `!checkout`) bên trong kênh này để **trả phòng, gỡ Role và nhận lại 50% tiền VNĐ**.', inline: false },
-                        { name: '<:emoji_11:1554594841084690483> Thông tin thuế & Duy trì', value: roomType === 'dacbiet' ? '• Giá thuê: **30.000.000đ**
-• **MIỄN PHÍ THUẾ DUY TRÌ & SỞ HỮU MÃI MÃI!**' : `• Giá thuê: **${formatMoney(roomInfo.price)}**
-• Phí duy trì: **${formatMoney(roomInfo.tax)} / giờ** (Trừ tự động vào ví).`, inline: false },
+                        { name: '<:emoji_11:1554594841084690483> Thông tin thuế & Duy trì', value: roomType === 'dacbiet' ? '• Giá thuê: **30.000.000đ**\n• **MIỄN PHÍ THUẾ DUY TRÌ & SỞ HỮU MÃI MÃI!**' : `• Giá thuê: **${formatMoney(roomInfo.price)}**\n• Phí duy trì: **${formatMoney(roomInfo.tax)} / giờ** (Trừ tự động vào ví).`, inline: false },
                         { name: '<a:as_warning:1554611415514357760> Lưu ý', value: roomType === 'dacbiet' ? 'Phòng Đặc Biệt sở hữu mãi mãi và không bao giờ bị thu hồi do hết tiền!' : 'Nếu ví hết tiền khi đến hạn đóng thuế, phòng và Role sẽ tự động bị thu hồi!', inline: false }
                     )
                     .setTimestamp();
@@ -1163,8 +1114,7 @@ client.on('interactionCreate', async interaction => {
                     if (coin) {
                         const val = count * coin.price;
                         totalValue += val;
-                        desc += `• **${coin.name} (${symbol})**: ${count} coin | Giá trị: **${formatMoney(val)}**
-`;
+                        desc += `• **${coin.name} (${symbol})**: ${count} coin | Giá trị: **${formatMoney(val)}**\n`;
                     }
                 }
                 const embed = new EmbedBuilder()
@@ -1333,7 +1283,6 @@ client.on('messageCreate', async message => {
         const inputWord = message.content.trim().toLowerCase();
         const wordParts = inputWord.split(/\s+/);
 
-        // ĐÃ SỬA: KHÔNG TRỪ TIỀN KHI GÕ SAI ĐỊNH DẠNG HOẶC GÕ 1 TỪ/NHIỀU TỪ (Chỉ nhắc nhở nhẹ)
         if (wordParts.length !== 2) {
             await message.reply(`<a:no:1554602168093507685> Từ **"${inputWord}"** chưa đúng định dạng từ ghép 2 tiếng nhé! (Không bị trừ tiền).`);
             return message.react('<:tu_choii:1554623553452777534>');
@@ -1343,37 +1292,28 @@ client.on('messageCreate', async message => {
         const lastWordParts = wordSession.currentWord.split(/\s+/);
         const requiredStartWord = lastWordParts[lastWordParts.length - 1];
 
-        // ĐÃ SỬA: BỎ TRỪ TIỀN KHI TỰ NỐI CHÍNH MÌNH (Chỉ nhắc nhở)
         if (wordSession.lastUserId === userId) {
             await message.reply(`<a:as_warning:1554611415514357760> Bạn phải đợi người chơi khác nối tiếp chứ!`);
             return message.react('<:tu_choii:1554623553452777534>');
         }
 
-        // ĐÃ SỬA: BỎ TRỪ TIỀN KHI NỐI SAI ÂM ĐẦU (Chỉ nhắc nhở)
         if (wordParts[0] !== requiredStartWord) {
             await message.reply(`<a:no:1554602168093507685> Phải bắt đầu bằng từ **"${requiredStartWord}"** cơ mà!`);
             return message.react('<:tu_choii:1554623553452777534>');
         }
 
-        // ĐÃ SỬA: BỎ TRỪ TIỀN KHI DÙNG TRÙNG TỪ (Chỉ nhắc nhở)
         if (wordSession.usedWords.has(inputWord)) {
             await message.reply(`<a:no:1554602168093507685> Từ **"${inputWord}"** đã được dùng rồi, hãy chọn từ khác nhé!`);
             return message.react('<:tu_choii:1554623553452777534>');
         }
 
-        // ĐÃ SỬA: BỎ QUA KIỂM TRA WIKTIONARY HOẶC KHÔNG PHẠT TIỀN KHI API LỖI/KHÔNG CÓ TRONG TỪ ĐIỂN ONLINE (Cho phép người chơi thoải mái gõ từ ghép thông dụng)
-        const isExistInDict = await checkVietnameseWordOnline(inputWord);
-        // Nếu muốn cực kỳ dễ, bạn có thể comment hẳn đoạn check này lại. Ở đây ta giữ lại nhưng chỉ báo nhẹ, không trừ tiền khi không thấy.
-        if (!isExistInDict) {
-            // Cho phép qua luôn hoặc chỉ thông báo nhẹ nhàng không trừ tiền để người chơi không bị ức chế
-            // (Nếu muốn nới lỏng tuyệt đối, có thể bỏ điều kiện này luôn)
-        }
+        await checkVietnameseWordOnline(inputWord);
 
         wordSession.currentWord = inputWord;
         wordSession.lastUserId = userId;
         wordSession.usedWords.add(inputWord);
 
-        const REWARD = 10000; // Tăng thưởng lên 10.000đ cho hấp dẫn
+        const REWARD = 10000;
         setBalance(userId, getBalance(userId) + REWARD);
 
         await message.react('<a:Verify:1554597525640585328>');
@@ -1387,9 +1327,6 @@ client.on('messageCreate', async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // ==========================================
-        // LỆNH NẠP TIỀN QUA QR GỬI DM CHO NGƯỜI DÙNG
-        // ==========================================
         if (command === 'nap' || command === 'naptien') {
             const amount = parseInt(args[0], 10);
             if (isNaN(amount) || amount <= 1000) {
@@ -1413,21 +1350,12 @@ client.on('messageCreate', async message => {
             const dmEmbed = new EmbedBuilder()
                 .setColor('Gold')
                 .setTitle('<:tp_bank:1554872609966137480> HƯỚNG DẪN CHUYỂN KHOẢN NẠP TIỀN')
-                .setDescription(`Bạn vừa tạo yêu cầu nạp **${formatMoney(amount)}**.
-
-Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
-` +
-                    `• **Ngân hàng:** TPBank
-` +
-                    `• **Số tài khoản:** \`${accountNo}\`
-` +
-                    `• **Chủ tài khoản:** LE BAO TRUNG
-` +
-                    `• **Số tiền:** \`${amount}\`
-` +
-                    `• **Nội dung chuyển khoản:** \`${addInfo}\`
-
-` +
+                .setDescription(`Bạn vừa tạo yêu cầu nạp **${formatMoney(amount)}**.\n\nVui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:\n` +
+                    `• **Ngân hàng:** TPBank\n` +
+                    `• **Số tài khoản:** \`${accountNo}\`\n` +
+                    `• **Chủ tài khoản:** LE BAO TRUNG\n` +
+                    `• **Số tiền:** \`${amount}\`\n` +
+                    `• **Nội dung chuyển khoản:** \`${addInfo}\`\n\n` +
                     `*Sau khi chuyển khoản, hệ thống Admin sẽ kiểm tra và duyệt tiền vào tài khoản cho bạn trong giây lát!*`)
                 .setImage(qrUrl)
                 .setTimestamp();
@@ -1443,9 +1371,7 @@ Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
                 const adminEmbed = new EmbedBuilder()
                     .setColor('Yellow')
                     .setTitle('<:new:1554872471629463573> YÊU CẦU NẠP TIỀN MỚI CẦN DUYỆT')
-                    .setDescription(`• **Người chơi:** ${message.author} (\`${message.author.id}\`)
-• **Số tiền nạp:** **${formatMoney(amount)}**
-• **Nội dung CK:** \`${addInfo}\``)
+                    .setDescription(`• **Người chơi:** ${message.author} (\`${message.author.id}\`)\n• **Số tiền nạp:** **${formatMoney(amount)}**\n• **Nội dung CK:** \`${addInfo}\``)
                     .setTimestamp();
 
                 const rowButtons = new ActionRowBuilder().addComponents(
@@ -1481,16 +1407,10 @@ Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
                 .setColor('Gold')
                 .setTitle('🏨 HỆ THỐNG THUÊ PHÒNG KHÁCH SẠN 24/7')
                 .setDescription(
-                    `Thuê phòng riêng tư để nhận ngay **Danh mục, Role độc quyền, Kênh Chat và Kênh Voice riêng**!
-
-` +
-                    `• **${HOTEL_PRICES.vip.name}:** \`${formatMoney(HOTEL_PRICES.vip.price)}\` (Thuế: ${formatMoney(HOTEL_PRICES.vip.tax)}/giờ)
-` +
-                    `• **${HOTEL_PRICES.hoanggia.name}:** \`${formatMoney(HOTEL_PRICES.hoanggia.price)}\` (Thuế: ${formatMoney(HOTEL_PRICES.hoanggia.tax)}/giờ)
-` +
-                    `• **${HOTEL_PRICES.dacbiet.name}:** \`${formatMoney(HOTEL_PRICES.dacbiet.price)}\` (**MIỄN PHÍ THUẾ - SỞ HỮU MÃI MÃI & TẶNG 50.000.000đ**)
-
-` +
+                    `Thuê phòng riêng tư để nhận ngay **Danh mục, Role độc quyền, Kênh Chat và Kênh Voice riêng**!\n\n` +
+                    `• **${HOTEL_PRICES.vip.name}:** \`${formatMoney(HOTEL_PRICES.vip.price)}\` (Thuế: ${formatMoney(HOTEL_PRICES.vip.tax)}/giờ)\n` +
+                    `• **${HOTEL_PRICES.hoanggia.name}:** \`${formatMoney(HOTEL_PRICES.hoanggia.price)}\` (Thuế: ${formatMoney(HOTEL_PRICES.hoanggia.tax)}/giờ)\n` +
+                    `• **${HOTEL_PRICES.dacbiet.name}:** \`${formatMoney(HOTEL_PRICES.dacbiet.price)}\` (**MIỄN PHÍ THUẾ - SỞ HỮU MÃI MÃI & TẶNG 50.000.000đ**)\n\n` +
                     `*Bấm nút bên dưới để chọn phòng muốn thuê:*`
                 );
 
@@ -1691,8 +1611,7 @@ Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
             const bet = parseInt(args[1], 10);
 
             if (!num || !/^\d{2}$/.exec(num) || isNaN(bet) || bet <= 0) {
-                return message.reply(`<a:no:1554602168093507685> Cú pháp: \`!${command} <số_2_chữ_số> <tiền_cược>\`
-*(VD: \`!${command} 68 50000\`)*`);
+                return message.reply(`<a:no:1554602168093507685> Cú pháp: \`!${command} <số_2_chữ_số> <tiền_cược>\`\n*(VD: \`!${command} 68 50000\`)*`);
             }
 
             const bal = getBalance(userId);
@@ -1797,8 +1716,7 @@ Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
 
             let replyMessage = `<a:yes:1554602231389487125> Đã import thành công **${successCount}/${attachments.length}** file dữ liệu! Bot đã tự động nạp lại bộ nhớ RAM.`;
             if (failedFiles.length > 0) {
-                replyMessage += `
-<a:as_warning:1554611415514357760> Các file lỗi/không nhận diện: ${failedFiles.join(', ')}`;
+                replyMessage += `\n<a:as_warning:1554611415514357760> Các file lỗi/không nhận diện: ${failedFiles.join(', ')}`;
             }
 
             return message.reply(replyMessage);
@@ -1840,14 +1758,9 @@ Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
         if (command === 'listadmin' || command === 'admins') {
             if (!isBotOwner(userId)) return message.reply('<a:no:1554602168093507685> Bạn không có quyền xem danh sách này!');
             
-            let desc = `<a:Crown:1554608058460676167> **Owner:**
-` + ADMIN_IDS.map(id => `• <@${id}>`).join('
-') + `
-`;
+            let desc = `<a:Crown:1554608058460676167> **Owner:**\n` + ADMIN_IDS.map(id => `• <@${id}>`).join('\n') + `\n`;
             if (adminList.users.length > 0) {
-                desc += `<:994180roleadminred:1554607509724209153> **Admin:**
-` + adminList.users.map(id => `• <@${id}>`).join('
-');
+                desc += `<:994180roleadminred:1554607509724209153> **Admin:**\n` + adminList.users.map(id => `• <@${id}>`).join('\n');
             } else {
                 desc += `<:994180roleadminred:1554607509724209153> **Admin:** Chưa có ai.`;
             }
@@ -1894,8 +1807,7 @@ Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
                 return message.reply('<:1503moderatorbadge:1554610677220511774> Danh sách Staff hiện tại đang trống.');
             }
 
-            const staffMentions = staffList.users.map(id => `• <@${id}>`).join('
-');
+            const staffMentions = staffList.users.map(id => `• <@${id}>`).join('\n');
             const embed = new EmbedBuilder()
                 .setColor('Blue')
                 .setTitle('<:1503moderatorbadge:1554610677220511774> Danh Sạch Staff')
@@ -1909,8 +1821,7 @@ Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
             if (subCmd === 'chart' || subCmd === 'bieudo') {
                 const symbol = args[1]?.toUpperCase();
                 if (!symbol || !cryptoMarket.coins[symbol]) {
-                    return message.reply('<a:no:1554602168093507685> Cú pháp xem biểu đồ: `!coin chart <MÃ_COIN>`
-*(VD: `!coin chart BTC`)*');
+                    return message.reply('<a:no:1554602168093507685> Cú pháp xem biểu đồ: `!coin chart <MÃ_COIN>`\n*(VD: `!coin chart BTC`)*');
                 }
 
                 const coin = cryptoMarket.coins[symbol];
@@ -1943,8 +1854,7 @@ Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
                     if (coin) {
                         const val = count * coin.price;
                         totalValue += val;
-                        desc += `• **${coin.name} (${symbol})**: ${count} coin | Giá trị: **${formatMoney(val)}**
-`;
+                        desc += `• **${coin.name} (${symbol})**: ${count} coin | Giá trị: **${formatMoney(val)}**\n`;
                     }
                 }
 
@@ -1961,16 +1871,13 @@ Vui lòng quét mã QR bên dưới hoặc chuyển khoản theo thông tin sau:
             for (const [symbol, coin] of Object.entries(cryptoMarket.coins)) {
                 const trendEmoji = coin.change > 0 ? '<:stonks:1554601546820493472> ▲' : (coin.change < 0 ? '<:notstonks:1554601468810756266> ▼' : '🟡 ➖');
                 const sign = coin.change > 0 ? '+' : '';
-                marketText += `${trendEmoji} **${coin.name} (${symbol})**: **${formatMoney(coin.price)}** (${sign}${coin.change}%)
-`;
+                marketText += `${trendEmoji} **${coin.name} (${symbol})**: **${formatMoney(coin.price)}** (${sign}${coin.change}%)\n`;
             }
 
             const embedMarket = new EmbedBuilder()
                 .setColor('Blurple')
                 .setTitle('📊 THỊ TRƯỜNG CHỨNG KHOÁN & COIN ÁO')
-                .setDescription(`*Chọn các nút bên dưới để thực hiện nhanh thao tác (Mua, Bán, Xem biểu đồ, Xem ví).*:
-
-${marketText}`);
+                .setDescription(`*Chọn các nút bên dưới để thực hiện nhanh thao tác (Mua, Bán, Xem biểu đồ, Xem ví).*:\n\n${marketText}`);
 
             const row = getCrypto4ButtonsRow();
 
@@ -1996,9 +1903,7 @@ ${marketText}`);
                 const embed = new EmbedBuilder()
                     .setColor('Yellow')
                     .setTitle('<:bank:1554873664254644244> NGÂN HÀNG 2ChânBank - THÔNG TIN VAY')
-                    .setDescription(`• Lãi suất cố định: **${LOAN_INTEREST_RATE * 100}%**
-• Hạn ngạch tối đa: **${formatMoney(MAX_LOAN_LIMIT)}**
-• Nợ hiện tại của bạn: **${formatMoney(currentDebt)}**`);
+                    .setDescription(`• Lãi suất cố định: **${LOAN_INTEREST_RATE * 100}%**\n• Hạn ngạch tối đa: **${formatMoney(MAX_LOAN_LIMIT)}**\n• Nợ hiện tại của bạn: **${formatMoney(currentDebt)}**`);
                 return message.reply({ embeds: [embed] });
             }
 
@@ -2096,7 +2001,7 @@ ${marketText}`);
                 return message.reply('⚠ **Đã reset số dư của TOÀN BỘ thành viên trong server về mức khởi điểm (50.000đ)!**');
             }
 
-            setBalance(targetUser.id, 50000); 
+                    setBalance(targetUser.id, 50000); 
             return message.reply(`🔄 Đã reset số dư của ${targetUser} về mức khởi điểm (**50.000đ**) thành công!`);
         }
 
@@ -2183,36 +2088,22 @@ ${marketText}`);
                 .addFields(
                     { 
                         name: '🛠️ Cấu Hình Hệ Thống & Kênh', 
-                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động
-• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động
-• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề
-• `!setadminpay`: Đặt kênh nhận yêu cầu duyệt nạp tiền
-• `!setnoitu`: Đặt kênh chơi game Nối Từ
-• `!kqsx` (hoặc `!quayso`): Ép bot ra kết quả Xổ Số & Lô Đề ngay lập tức', 
+                        value: '• `!setcoin`: Đặt kênh thông báo biến động Crypto tự động\n• `!settaixiu`: Đặt kênh chơi Tài Xỉu tự động\n• `!setlode`: Đặt kênh thông báo Xổ số / Lô đề\n• `!setadminpay`: Đặt kênh nhận yêu cầu duyệt nạp tiền\n• `!setnoitu`: Đặt kênh chơi game Nối Từ\n• `!kqsx` (hoặc `!quayso`): Ép bot ra kết quả Xổ Số & Lô Đề ngay lập tức', 
                         inline: false 
                     },
                     { 
                         name: '💵 Quản Lý Kinh Tế & Thành Viên', 
-                        value: '• `!cong @user <số_tiền>`: Cộng tiền cho người chơi
-• `!tru @user <số_tiền>`: Trừ tiền của người chơi (Staff+)
-• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng (Owner)
-• `!resetmoney @user` (hoặc `all`): Reset ví tiền về mặc định (Owner)', 
+                        value: '• `!cong @user <số_tiền>`: Cộng tiền cho người chơi\n• `!tru @user <số_tiền>`: Trừ tiền của người chơi (Staff+)\n• `!settitle @user <Danh hiệu>`: Cấp danh hiệu cho người dùng (Owner)\n• `!resetmoney @user` (hoặc `all`): Reset ví tiền về mặc định (Owner)', 
                         inline: false 
                     },
                     { 
                         name: '🛡️ Quản Lý Quyền Hạn (Admin/Staff)', 
-                        value: '• `!addadmin @user`: Thêm Admin phụ
-• `!removeadmin @user`: Gỡ Admin phụ
-• `!listadmin`: Xem danh sách Admin
-• `!addstaff @user`: Thêm quản trị viên Staff
-• `!removestaff @user`: Xóa quản trị viên Staff
-• `!liststaff`: Xem danh sách Staff', 
+                        value: '• `!addadmin @user`: Thêm Admin phụ\n• `!removeadmin @user`: Gỡ Admin phụ\n• `!listadmin`: Xem danh sách Admin\n• `!addstaff @user`: Thêm quản trị viên Staff\n• `!removestaff @user`: Xóa quản trị viên Staff\n• `!liststaff`: Xem danh sách Staff', 
                         inline: false 
                     },
                     { 
                         name: '📦 Sao Lưu & Khôi Phục Dữ Liệu', 
-                        value: '• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu qua tin nhắn riêng (Chỉ Owner)
-• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
+                        value: '• `!exportdata`: Sao lưu và gửi toàn bộ file dữ liệu qua tin nhắn riêng (Chỉ Owner)\n• `!importdata`: Đính kèm file JSON để cập nhật dữ liệu hàng loạt (Chỉ Owner)', 
                         inline: false 
                     }
                 )
@@ -2284,8 +2175,7 @@ ${marketText}`);
             let desc = '';
             for (let i = 0; i < sortedBalances.length; i++) {
                 const [uId, amount] = sortedBalances[i];
-                desc += `**#${i + 1}** <@${uId}> - **${formatMoney(amount)}**
-`;
+                desc += `**#${i + 1}** <@${uId}> - **${formatMoney(amount)}**\n`;
             }
 
             const embed = new EmbedBuilder()
